@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<script>
+  if (sessionStorage.getItem('authenticated') !== 'true') {
+    const pwd = prompt('This app is password protected. Enter password:');
+    if (pwd === 'prometheus2026') {
+      sessionStorage.setItem('authenticated', 'true');
+    } else {
+      document.write('<div style="font-family: sans-serif; text-align: center; margin-top: 20vh;"><h1>Unauthorized</h1><p>Incorrect password.</p><button onclick="location.reload()">Try Again</button></div>');
+      window.stop();
+      throw new Error('Unauthorized');
+    }
+  }
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cebu City Bailiwick Map — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1220;--ink2:#0E1626;--panel:#121C2E;--panel2:#16223a;--line:#243450;--line2:#2f4364;
+  --mist:#8DA2C0;--dim:#5b6f8d;--paper:#E8EEF6;--signal:#35C0D0;--sea:#0a1830;--sea2:#0d1f3b;
+  --rama:#4C8DF6;--bopk:#E5484D;--swing:#E9C217;--none:#6B7A90;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --disp:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --ink:#EEF2F8;--ink2:#E4EAF3;--panel:#FFFFFF;--panel2:#F3F6FB;--line:#D3DCE8;--line2:#B9C6D8;
+    --mist:#4F6380;--dim:#7A8BA3;--paper:#0E1626;--signal:#0E8C9C;--sea:#DCE6F2;--sea2:#D2DEEC;--none:#9AA6B6;
+  }
+}
+:root[data-theme="light"]{
+  --ink:#EEF2F8;--ink2:#E4EAF3;--panel:#FFFFFF;--panel2:#F3F6FB;--line:#D3DCE8;--line2:#B9C6D8;
+  --mist:#4F6380;--dim:#7A8BA3;--paper:#0E1626;--signal:#0E8C9C;--sea:#DCE6F2;--sea2:#D2DEEC;--none:#9AA6B6;
+}
+:root[data-theme="dark"]{
+  --ink:#0B1220;--ink2:#0E1626;--panel:#121C2E;--panel2:#16223a;--line:#243450;--line2:#2f4364;
+  --mist:#8DA2C0;--dim:#5b6f8d;--paper:#E8EEF6;--signal:#35C0D0;--sea:#0a1830;--sea2:#0d1f3b;--none:#6B7A90;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh;height:100dvh}
+header{display:flex;align-items:center;gap:18px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--ink2);flex-wrap:wrap}
+.brand h1{font-family:var(--disp);font-weight:700;font-size:19px;margin:0;letter-spacing:.01em}
+.brand p{margin:0;color:var(--mist);font-size:12px}
+.sample{font-family:var(--mono);font-size:11px;color:var(--swing);border:1px dashed color-mix(in srgb,var(--swing) 60%,transparent);padding:3px 8px;border-radius:4px;white-space:nowrap}
+.seg{display:flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-left:auto}
+.seg button{background:transparent;border:0;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--mist);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--paper);box-shadow:inset 0 -2px 0 var(--signal)}
+.seg .lbl{font-family:var(--disp);font-weight:600}
+
+main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,1fr);min-height:0}
+.mapwrap{position:relative;min-height:0;background:radial-gradient(120% 90% at 70% 80%,var(--sea2),var(--sea));overflow:hidden;border-right:1px solid var(--line)}
+svg#map{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+svg#map.drag{cursor:grabbing}
+.bg path{stroke:var(--ink);stroke-width:.8;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill-opacity .2s,filter .2s}
+.bg path:hover{filter:brightness(1.18)}
+.bg path.dim{fill-opacity:.12}
+.sel{fill:none;stroke:var(--signal);stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 0 6px var(--signal))}
+.labels text{font-family:var(--disp);font-weight:600;fill:#fff;paint-order:stroke;stroke:rgba(8,14,26,.7);stroke-width:3px;text-anchor:middle;pointer-events:none;dominant-baseline:middle}
+.grat line{stroke:var(--line);stroke-width:.6;vector-effect:non-scaling-stroke;opacity:.5}
+.ctx text{font-family:var(--body);font-style:italic;fill:var(--dim);pointer-events:none}
+.tools{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:6px}
+.tools button{width:34px;height:34px;border-radius:7px;background:var(--panel);border:1px solid var(--line2);cursor:pointer;font-size:16px;line-height:1}
+.tools button.wide{width:auto;padding:0 10px;font-size:12px}
+.search{position:absolute;top:12px;right:12px;width:min(240px,50%)}
+.search input{width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);color:var(--paper);font:inherit}
+.search ul{list-style:none;margin:4px 0 0;padding:0;background:var(--panel);border:1px solid var(--line2);border-radius:7px;max-height:220px;overflow:auto}
+.search li button{width:100%;text-align:left;background:none;border:0;padding:7px 10px;cursor:pointer}
+.search li button:hover,.search li button:focus{background:var(--panel2)}
+.legend{position:absolute;left:12px;bottom:12px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line2);border-radius:9px;padding:10px 12px;min-width:210px}
+.legend h3{margin:0 0 6px;font-family:var(--disp);font-size:13px;font-weight:600}
+.legend button{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 2px;cursor:pointer;text-align:left;border-radius:4px}
+.legend button[aria-pressed="false"]{opacity:.35}
+.legend .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--mist)}
+.legend small{display:block;color:var(--dim);font-size:11px;margin-top:6px}
+.sw{width:14px;height:14px;border-radius:3px;flex:none}
+.tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:10;display:none;min-width:170px}
+.tip b{font-family:var(--disp);font-size:14px;display:block}
+.tip .m{color:var(--mist)}
+
+aside{overflow:auto;min-height:0;background:var(--panel);padding:18px 20px 28px}
+.crumb{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--mist);margin-bottom:10px;flex-wrap:wrap}
+.crumb button{background:none;border:0;padding:0;color:var(--signal);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+h2{font-family:var(--disp);font-size:24px;line-height:1.15;margin:0 0 4px;font-weight:700}
+.sub{color:var(--mist);margin:0 0 16px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-weight:600;font-size:12.5px;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:14px 0 20px}
+.stats div{background:var(--panel2);padding:10px 12px}
+.stats b{display:block;font-family:var(--disp);font-size:20px;font-weight:600}
+.stats span{font-size:11.5px;color:var(--mist)}
+section{margin-bottom:22px}
+section>h3{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 10px;display:flex;align-items:baseline;gap:8px}
+section>h3 small{font-family:var(--body);font-weight:400;color:var(--dim);font-size:12px}
+.bar{margin-bottom:10px}
+.bar .t{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mist);margin-bottom:4px}
+.bar .t b{color:var(--paper);font-weight:500}
+.stack{display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--line)}
+.stack i{display:flex;align-items:center;justify-content:center;font-style:normal;font-family:var(--mono);font-size:10.5px;color:#fff;min-width:0;overflow:hidden;white-space:nowrap}
+.stack i.lt{color:#1a1a1a}
+details{border-top:1px solid var(--line)}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{display:flex;align-items:center;gap:8px;padding:9px 2px;cursor:pointer;list-style:none;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary .n{margin-left:auto;color:var(--mist);font-family:var(--mono);font-size:12px}
+summary::after{content:"+";color:var(--dim);width:14px;text-align:center}
+details[open] summary::after{content:"–"}
+.alist{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:0 2px 10px}
+.alist button{background:none;border:0;text-align:left;padding:4px 6px;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;gap:6px;font-size:13px}
+.alist button:hover{background:var(--panel2)}
+.alist small{color:var(--dim);font-family:var(--mono);font-size:11px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:right;font-weight:500;color:var(--mist);padding:6px 6px;border-bottom:1px solid var(--line2)}
+td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+.win{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:1px}
+.div{display:grid;grid-template-columns:40px 1fr;gap:4px 8px;align-items:center;font-size:11.5px;margin-top:10px}
+.div .track{position:relative;height:12px;background:linear-gradient(90deg,transparent calc(50% - .5px),var(--line2) calc(50% - .5px),var(--line2) calc(50% + .5px),transparent calc(50% + .5px))}
+.div .track i{position:absolute;top:1px;height:10px;border-radius:2px}
+.div .ax{grid-column:2;display:flex;justify-content:space-between;color:var(--dim);font-size:10.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chips button{background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.chips button[aria-pressed="true"]{border-color:var(--signal)}
+.pp{margin-bottom:12px}
+.pp h4{margin:0 0 6px;font-size:12.5px;font-weight:500;color:var(--mist)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:5px}
+.tiles button{border:0;border-radius:5px;padding:7px 4px;font-family:var(--mono);font-size:11px;color:#fff;cursor:pointer;text-align:center}
+.tiles button.lt{color:#1a1a1a}
+.tiles button:hover{outline:2px solid var(--paper);outline-offset:-2px}
+.note{font-size:12px;color:var(--dim);border-left:2px solid var(--line2);padding-left:10px;margin-top:16px}
+.back{background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:6px 12px;cursor:pointer;margin-bottom:14px}
+
+@media (max-width:900px){
+  .app{height:auto}
+  main{grid-template-columns:1fr}
+  .mapwrap{height:68vh;border-right:0;border-bottom:1px solid var(--line)}
+  .seg{margin-left:0;overflow-x:auto;max-width:100%}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .legend{min-width:0}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><h1>Cebu City bailiwick map</h1><p>Mayoral race · Rama camp vs BOPK · 80 barangays</p></div>
+  <span class="sample" title="Votes, voters and precincts are generated for layout testing. Barangay boundaries are real (PSGC 2023).">Sample data — not election results</span>
+  <div class="seg" role="group" aria-label="View" id="modes"></div>
+</header>
+<main>
+  <div class="mapwrap" id="mapwrap">
+    <svg id="map" role="img" aria-label="Map of Cebu City barangays">
+      <g id="vp">
+        <g class="grat" id="grat"></g>
+        <g class="bg" id="bg"></g>
+        <path class="sel" id="sel" d=""/>
+        <g class="labels" id="labels"></g>
+        <g class="ctx" id="ctx"></g>
+      </g>
+    </svg>
+    <div class="tools">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zreset" aria-label="Show whole city">⤢</button>
+      <button id="zdown" class="wide" aria-label="Zoom to downtown">Downtown</button>
+    </div>
+    <div class="search"><input id="q" type="search" placeholder="Find a barangay" aria-label="Find a barangay" autocomplete="off"><ul id="qres" hidden></ul></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <aside id="panel" aria-live="polite"></aside>
+</main>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const GEO = {"W":1000,"H":1519,"b":[{"id":730600001,"name":"Adlaon","district":"North","d":"M719.7,223.4L677.7,198.0L659.5,185.9L559.1,276.1L537.8,353.1L545.0,392.1L644.0,423.8L701.7,385.4L721.9,352.1L798.5,232.2L744.2,229.9L732.4,224.0L719.7,223.4Z","cx":653.0,"cy":307.3,"area":10.63},{"id":730600002,"name":"Agsungot","district":"North","d":"M859.4,288.8L844.2,283.3L807.9,315.7L806.6,323.6L822.4,377.3L858.4,416.2L904.3,417.6L921.1,407.2L917.1,375.0L898.9,307.9L859.4,288.8Z","cx":865.3,"cy":353.6,"area":3.16},{"id":730600003,"name":"Apas","district":"North","d":"M904.1,992.1L889.2,983.0L885.0,974.0L878.3,972.4L871.2,962.5L859.5,956.9L852.3,947.1L826.4,949.3L815.9,970.4L802.4,962.0L798.0,964.1L815.0,984.0L823.0,1019.6L857.7,1045.4L860.3,1039.0L871.9,1044.3L890.5,1057.8L895.5,1043.0L904.1,992.1Z","cx":857.2,"cy":998.6,"area":1.93},{"id":730600004,"name":"Babag","district":"South","d":"M599.3,782.0L568.3,712.5L556.6,692.8L561.0,681.3L561.5,670.0L479.4,688.9L408.5,725.0L459.2,792.0L450.5,823.9L499.9,901.8L539.7,892.9L680.0,862.9L624.3,848.7L621.4,831.5L599.3,782.0Z","cx":527.1,"cy":790.6,"area":9.2},{"id":730600005,"name":"Basak Pardo","district":"South","d":"M600.1,1299.9L580.6,1298.3L584.4,1324.3L579.6,1332.5L581.6,1339.3L573.8,1351.2L585.6,1356.2L594.0,1363.7L599.5,1385.2L606.1,1386.9L605.5,1397.7L621.0,1405.1L616.3,1410.5L700.3,1448.8L709.1,1454.4L711.2,1443.7L717.9,1435.6L715.0,1429.0L700.4,1421.8L712.9,1387.4L716.9,1380.3L688.1,1349.0L684.0,1354.7L638.8,1399.7L622.2,1386.4L617.9,1379.3L620.9,1372.8L613.7,1359.8L610.7,1344.1L611.6,1330.9L605.9,1319.1L605.3,1309.0L600.1,1299.9Z","cx":651.8,"cy":1385.2,"area":2.27},{"id":730600006,"name":"Bacayan","district":"North","d":"M983.1,671.0L958.4,667.7L956.9,673.0L941.5,674.3L927.1,688.2L925.2,696.1L927.0,714.0L936.7,733.5L943.8,735.2L961.0,735.1L964.0,753.1L968.3,761.9L980.3,774.3L983.5,785.5L999.0,774.9L992.0,765.3L991.0,751.6L983.5,747.0L986.1,729.0L981.1,714.3L977.0,712.9L983.0,691.5L983.1,671.0Z","cx":961.8,"cy":715.8,"area":1.27},{"id":730600007,"name":"Banilad","district":"North","d":"M854.2,891.4L815.9,823.9L764.8,829.6L774.5,856.8L792.4,860.4L800.5,864.6L830.1,896.8L828.9,902.9L847.7,931.7L852.3,947.1L859.5,956.9L871.2,962.5L878.3,972.4L885.0,974.0L889.2,983.0L904.1,992.1L911.7,995.2L921.2,956.4L926.8,940.5L927.9,926.8L885.9,917.8L864.7,901.5L854.2,891.4Z","cx":855.0,"cy":907.9,"area":2.37},{"id":730600008,"name":"Basak San Nicolas","district":"South","d":"M666.4,1298.8L633.7,1304.0L616.1,1298.2L600.1,1299.9L605.3,1309.0L605.9,1319.1L611.6,1330.9L610.7,1344.1L613.7,1359.8L620.9,1372.8L617.9,1379.3L622.2,1386.4L638.8,1399.7L684.0,1354.7L672.3,1342.2L665.2,1319.8L666.4,1298.8Z","cx":640.5,"cy":1343.1,"area":1.51},{"id":730600010,"name":"Binaliw","district":"North","d":"M978.5,537.8L981.7,477.9L984.2,418.0L976.1,379.6L977.8,365.6L951.6,367.6L917.1,375.0L921.1,407.2L904.3,417.6L858.4,416.2L866.7,448.4L868.7,501.9L867.1,515.3L861.3,523.8L918.3,552.3L924.3,549.3L930.9,560.7L937.9,549.2L944.1,550.1L961.2,542.4L978.5,537.8Z","cx":928.7,"cy":465.2,"area":5.19},{"id":730600011,"name":"Bonbon","district":"South","d":"M450.5,823.9L459.2,792.0L408.5,725.0L353.8,730.0L232.0,744.2L265.4,774.7L214.5,830.7L211.7,844.4L189.6,886.9L193.5,929.9L203.5,930.0L324.4,871.5L336.7,886.7L367.9,873.8L419.0,832.9L450.5,823.9Z","cx":320.4,"cy":815.7,"area":9.39},{"id":730600013,"name":"Budlaan","district":"North","d":"M804.6,709.0L792.6,692.4L804.9,631.7L786.1,628.1L779.5,649.5L746.5,698.6L725.0,724.2L703.7,746.4L717.1,759.8L764.8,829.6L815.9,823.9L854.2,891.4L863.2,879.8L871.5,875.5L873.4,849.4L881.5,818.7L875.0,805.1L860.7,781.3L804.6,709.0Z","cx":796.5,"cy":767.6,"area":5.56},{"id":730600014,"name":"Buhisan","district":"South","d":"M584.7,1095.1L538.1,1014.4L434.9,1092.7L458.1,1153.4L463.8,1207.6L523.9,1296.7L532.9,1289.5L568.4,1276.3L599.7,1260.3L593.5,1241.5L578.6,1227.5L565.7,1208.8L551.0,1195.4L533.6,1165.2L556.1,1144.9L576.3,1113.7L584.7,1095.1Z","cx":517.6,"cy":1154.6,"area":7.41},{"id":730600015,"name":"Bulacao","district":"South","d":"M545.8,1418.4L536.8,1398.3L520.5,1375.7L516.7,1366.0L501.6,1343.2L485.5,1322.3L470.9,1316.5L440.5,1286.7L414.0,1236.8L353.9,1258.8L358.8,1274.6L374.7,1297.6L385.7,1351.9L418.2,1354.5L424.4,1369.4L433.1,1367.1L435.6,1373.6L451.4,1378.9L460.9,1377.6L476.0,1392.0L482.9,1406.2L489.5,1409.3L495.3,1420.2L492.5,1430.8L497.4,1445.4L507.4,1448.0L522.1,1457.6L530.8,1445.8L545.8,1418.4Z","cx":449.0,"cy":1339.7,"area":4.5},{"id":730600016,"name":"Buot-Taup","district":"South","d":"M336.7,886.7L324.4,871.5L203.5,930.0L193.5,929.9L143.1,986.6L138.9,1004.7L150.7,1006.4L154.6,1010.8L180.8,1022.5L191.8,1015.2L208.9,1016.0L204.5,1029.0L209.9,1040.7L215.1,1041.3L219.0,1027.6L237.2,1036.3L234.1,1043.7L252.6,1054.5L245.4,1068.6L251.9,1075.6L257.9,1065.3L268.1,1062.9L280.0,1074.2L291.6,1061.0L297.7,1070.5L326.6,1042.0L304.5,993.1L336.7,886.7Z","cx":252.7,"cy":976.3,"area":6.37},{"id":730600017,"name":"Busay","district":"North","d":"M703.7,746.4L661.6,744.8L646.9,748.0L638.6,758.7L599.3,782.0L621.4,831.5L624.3,848.7L680.0,862.9L682.0,983.6L719.3,979.4L757.6,975.8L785.2,963.8L789.7,968.2L798.0,964.1L802.4,962.0L815.9,970.4L826.4,949.3L852.3,947.1L847.7,931.7L828.9,902.9L830.1,896.8L800.5,864.6L792.4,860.4L774.5,856.8L764.8,829.6L717.1,759.8L703.7,746.4Z","cx":721.4,"cy":868.2,"area":9.14},{"id":730600018,"name":"Calamba","district":"South","d":"M756.6,1200.0L744.1,1196.8L719.8,1202.7L728.4,1226.2L734.3,1264.8L755.0,1270.1L763.0,1269.3L748.6,1253.0L746.6,1241.6L749.7,1236.1L747.9,1230.0L754.8,1223.4L750.4,1218.0L756.6,1200.0Z","cx":740.5,"cy":1229.8,"area":0.48},{"id":730600019,"name":"Cambinocot","district":"North","d":"M887.8,174.1L878.9,165.1L858.6,82.7L776.8,123.3L719.7,223.4L732.4,224.0L744.2,229.9L798.5,232.2L844.2,283.3L859.4,288.8L864.1,281.1L869.0,259.8L877.3,198.3L887.8,174.1Z","cx":818.2,"cy":183.9,"area":5.43},{"id":730600020,"name":"Capitol Site","district":"North","d":"M783.1,1125.4L772.3,1100.3L766.3,1090.7L760.6,1092.5L765.7,1106.2L759.9,1117.6L764.2,1125.0L755.4,1140.8L760.4,1154.4L756.4,1158.3L762.5,1168.6L758.8,1181.5L759.6,1193.3L756.6,1200.0L786.4,1190.4L800.5,1185.9L797.6,1171.5L784.2,1134.7L783.1,1125.4Z","cx":774.6,"cy":1154.3,"area":0.79},{"id":730600021,"name":"Carreta","district":"North","d":"M961.3,1209.0L959.8,1204.9L932.9,1172.3L922.3,1170.7L911.2,1182.2L902.9,1186.8L892.3,1175.4L875.1,1195.7L872.9,1199.8L891.1,1209.4L892.4,1206.0L920.4,1240.5L932.0,1233.2L961.3,1209.0Z","cx":919.9,"cy":1202.8,"area":0.96},{"id":730600022,"name":"Central","district":"North","d":"M853.7,1267.6L833.5,1267.7L818.2,1276.9L815.3,1285.3L823.5,1289.1L829.3,1289.7L825.5,1303.5L839.1,1313.6L852.8,1280.3L853.7,1267.6Z","cx":836.4,"cy":1285.9,"area":0.3},{"id":730600023,"name":"Cogon Ramos","district":"North","d":"M830.3,1230.2L826.7,1188.6L828.5,1177.6L800.5,1185.9L797.3,1193.4L818.5,1221.8L818.7,1233.0L830.3,1230.2Z","cx":817.3,"cy":1202.1,"area":0.3},{"id":730600024,"name":"Cogon Pardo","district":"South","d":"M616.3,1410.5L593.7,1391.3L572.8,1377.9L561.8,1373.9L557.8,1401.8L554.4,1424.1L564.8,1429.4L566.9,1436.0L582.4,1445.9L594.1,1448.8L615.2,1428.5L640.3,1441.4L668.9,1466.6L686.7,1480.7L709.1,1454.4L700.3,1448.8L616.3,1410.5Z","cx":618.5,"cy":1427.7,"area":1.55},{"id":730600025,"name":"Day-as","district":"North","d":"M853.8,1250.4L855.1,1234.8L852.1,1226.3L843.8,1239.0L841.1,1227.9L830.3,1230.2L834.9,1241.6L839.3,1251.3L853.8,1250.4Z","cx":844.1,"cy":1239.7,"area":0.12},{"id":730600027,"name":"Duljo Fatima","district":"South","d":"M746.7,1296.4L743.0,1275.8L739.5,1273.0L728.6,1278.2L703.3,1295.8L703.1,1303.7L710.4,1311.9L736.3,1321.2L745.1,1315.8L746.7,1296.4Z","cx":728.2,"cy":1298.7,"area":0.41},{"id":730600028,"name":"Ermita","district":"North","d":"M857.5,1432.2L857.9,1417.4L852.9,1415.8L850.5,1432.8L857.5,1432.2ZM866.9,1405.5L870.7,1396.5L869.6,1378.3L860.6,1377.1L856.8,1382.2L856.8,1397.6L866.9,1405.5ZM839.1,1313.6L825.5,1303.5L829.3,1289.7L823.5,1289.1L810.7,1294.5L798.2,1297.0L806.5,1321.2L810.5,1325.3L823.1,1315.3L832.7,1318.6L838.9,1313.7L839.1,1313.6Z","cx":816.7,"cy":1306.6,"area":0.35},{"id":730600029,"name":"Guadalupe","district":"South","d":"M682.3,1049.2L671.3,1040.4L664.2,1047.7L642.9,1061.0L584.7,1095.1L576.3,1113.7L556.1,1144.9L576.5,1166.8L590.0,1185.5L617.6,1186.0L623.8,1193.2L637.5,1194.1L636.4,1207.4L649.6,1209.8L660.3,1201.9L671.8,1199.9L681.7,1200.9L688.5,1209.8L702.4,1204.8L719.8,1202.7L744.1,1196.8L756.6,1200.0L759.6,1193.3L758.8,1181.5L762.5,1168.6L756.4,1158.3L760.4,1154.4L755.4,1140.8L764.2,1125.0L759.9,1117.6L765.7,1106.2L760.6,1092.5L753.6,1078.3L743.0,1075.6L739.8,1065.4L732.3,1063.8L724.7,1054.3L708.8,1042.4L690.5,1043.1L682.3,1049.2Z","cx":672.1,"cy":1130.0,"area":7.39},{"id":730600030,"name":"Guba","district":"North","d":"M844.2,283.3L798.5,232.2L721.9,352.1L701.7,385.4L644.0,423.8L624.2,448.6L654.2,441.3L735.0,501.4L799.2,531.7L808.0,574.0L808.7,600.2L824.3,598.0L838.5,553.5L861.3,523.8L867.1,515.3L868.7,501.9L866.7,448.4L858.4,416.2L822.4,377.3L806.6,323.6L807.9,315.7L844.2,283.3Z","cx":777.6,"cy":420.9,"area":10.9},{"id":730600031,"name":"Hipodromo","district":"North","d":"M888.2,1136.8L883.0,1130.9L867.9,1144.2L863.7,1155.7L856.4,1161.9L862.4,1187.8L875.1,1195.7L892.3,1175.4L888.2,1136.8Z","cx":875.8,"cy":1164.7,"area":0.44},{"id":730600032,"name":"Inayawan","district":"South","d":"M686.7,1480.7L668.9,1466.6L640.3,1441.4L615.2,1428.5L594.1,1448.8L582.4,1445.9L566.9,1436.0L564.8,1429.4L554.4,1424.1L557.8,1401.8L545.8,1418.4L530.8,1445.8L522.1,1457.6L519.4,1487.7L525.5,1490.3L549.3,1493.9L555.9,1508.4L565.4,1518.7L574.9,1503.5L615.8,1494.9L642.3,1499.3L660.2,1512.1L686.7,1480.7Z","cx":595.3,"cy":1469.5,"area":2.76},{"id":730600033,"name":"Kalubihan","district":"North","d":"M829.5,1259.5L813.3,1267.1L809.3,1255.1L801.0,1259.3L810.7,1294.5L823.5,1289.1L815.3,1285.3L818.2,1276.9L833.5,1267.7L829.5,1259.5Z","cx":814.8,"cy":1272.7,"area":0.16},{"id":730600034,"name":"Kalunasan","district":"South","d":"M766.3,1090.7L761.9,1069.1L765.9,1068.3L758.7,1043.1L752.0,1040.2L734.4,1012.1L719.3,979.4L682.0,983.6L675.5,988.4L676.1,1018.1L682.2,1042.2L682.3,1049.2L690.5,1043.1L708.8,1042.4L724.7,1054.3L732.3,1063.8L739.8,1065.4L743.0,1075.6L753.6,1078.3L760.6,1092.5L766.3,1090.7Z","cx":717.3,"cy":1026.5,"area":1.43},{"id":730600035,"name":"Kamagayan","district":"North","d":"M839.3,1251.3L834.9,1241.6L809.3,1255.1L813.3,1267.1L829.5,1259.5L840.8,1257.2L839.3,1251.3Z","cx":825.2,"cy":1254.6,"area":0.12},{"id":730600036,"name":"Camputhaw","district":"North","d":"M851.5,1126.5L844.5,1113.5L822.8,1113.2L810.7,1118.0L810.4,1108.6L794.5,1110.8L794.2,1118.4L783.1,1125.4L784.2,1134.7L797.6,1171.5L800.5,1185.9L828.5,1177.6L841.5,1178.6L854.6,1183.1L862.4,1187.8L856.4,1161.9L852.2,1150.2L855.0,1143.5L846.0,1137.5L851.5,1126.5Z","cx":821.7,"cy":1147.3,"area":1.25},{"id":730600037,"name":"Kasambagan","district":"North","d":"M911.7,995.2L904.1,992.1L895.5,1043.0L890.5,1057.8L878.0,1084.4L898.7,1118.6L910.6,1111.1L936.7,1084.3L952.8,1087.2L962.4,1076.3L956.3,1069.6L959.5,1059.1L966.7,1049.1L970.3,1036.6L957.6,1031.7L953.6,1038.5L946.4,1023.9L939.7,1022.1L936.8,1005.5L911.7,995.2Z","cx":920.9,"cy":1056.2,"area":1.85},{"id":730600038,"name":"Kinasang-an Pardo","district":"South","d":"M523.9,1296.7L463.8,1207.6L448.4,1215.9L506.3,1312.4L548.5,1367.6L561.8,1373.9L572.8,1377.9L593.7,1391.3L616.3,1410.5L621.0,1405.1L605.5,1397.7L606.1,1386.9L599.5,1385.2L594.0,1363.7L585.6,1356.2L573.8,1351.2L564.5,1344.2L556.0,1333.4L547.3,1341.7L541.7,1335.6L546.1,1324.1L523.9,1296.7Z","cx":526.1,"cy":1311.0,"area":1.52},{"id":730600040,"name":"Labangon","district":"South","d":"M719.8,1202.7L702.4,1204.8L688.5,1209.8L681.7,1200.9L671.8,1199.9L670.8,1215.1L673.1,1225.9L679.8,1235.2L687.1,1256.2L697.5,1275.7L700.1,1285.6L703.3,1295.8L728.6,1278.2L739.5,1273.0L734.3,1264.8L728.4,1226.2L719.8,1202.7Z","cx":705.7,"cy":1242.4,"area":1.13},{"id":730600041,"name":"Lahug","district":"North","d":"M798.0,964.1L789.7,968.2L785.2,963.8L757.6,975.8L719.3,979.4L734.4,1012.1L752.0,1040.2L758.7,1043.1L765.9,1068.3L761.9,1069.1L766.3,1090.7L772.3,1100.3L783.1,1125.4L794.2,1118.4L794.5,1110.8L810.4,1108.6L810.7,1118.0L822.8,1113.2L844.5,1113.5L851.5,1126.5L864.3,1103.9L878.0,1084.4L890.5,1057.8L871.9,1044.3L860.3,1039.0L857.7,1045.4L823.0,1019.6L815.0,984.0L798.0,964.1Z","cx":803.5,"cy":1046.3,"area":4.25},{"id":730600042,"name":"Lorega San Miguel","district":"North","d":"M862.4,1187.8L854.6,1183.1L845.3,1213.5L852.1,1226.3L861.5,1213.3L868.4,1215.0L872.9,1199.8L875.1,1195.7L862.4,1187.8Z","cx":858.9,"cy":1203.7,"area":0.2},{"id":730600043,"name":"Lusaran","district":"North","d":"M903.8,50.8L839.6,39.6L799.7,17.1L777.7,10.2L752.9,0.0L619.9,33.5L552.1,114.9L659.5,185.9L677.7,198.0L719.7,223.4L776.8,123.3L858.6,82.7L868.7,74.2L903.8,50.8Z","cx":710.3,"cy":94.8,"area":11.27},{"id":730600044,"name":"Luz","district":"North","d":"M898.7,1118.6L878.0,1084.4L864.3,1103.9L851.5,1126.5L846.0,1137.5L855.0,1143.5L852.2,1150.2L856.4,1161.9L863.7,1155.7L867.9,1144.2L883.0,1130.9L888.2,1136.8L902.0,1125.1L898.7,1118.6Z","cx":872.8,"cy":1122.5,"area":0.56},{"id":730600045,"name":"Mabini","district":"North","d":"M986.4,172.2L960.5,169.6L952.8,177.3L912.4,192.2L887.8,174.1L877.3,198.3L869.0,259.8L864.1,281.1L859.4,288.8L898.9,307.9L917.1,375.0L951.6,367.6L977.8,365.6L988.7,260.7L986.4,172.2Z","cx":933.9,"cy":266.2,"area":5.64},{"id":730600046,"name":"Mabolo","district":"North","d":"M961.3,1209.0L962.9,1210.7L993.9,1185.0L991.6,1179.3L969.0,1155.7L958.9,1159.6L948.7,1156.2L957.5,1148.7L957.9,1138.9L950.0,1123.7L960.3,1112.8L959.3,1101.7L963.3,1086.3L962.4,1076.3L952.8,1087.2L936.7,1084.3L910.6,1111.1L898.7,1118.6L902.0,1125.1L888.2,1136.8L892.3,1175.4L902.9,1186.8L911.2,1182.2L922.3,1170.7L932.9,1172.3L959.8,1204.9L961.3,1209.0Z","cx":936.5,"cy":1147.0,"area":1.96},{"id":730600048,"name":"Malubog","district":"North","d":"M786.1,628.1L605.2,572.5L605.1,581.9L595.1,597.0L585.7,607.0L566.8,612.5L565.6,619.8L571.5,634.6L560.2,665.9L561.5,670.0L561.0,681.3L556.6,692.8L568.3,712.5L599.3,782.0L638.6,758.7L646.9,748.0L661.6,744.8L703.7,746.4L725.0,724.2L746.5,698.6L779.5,649.5L786.1,628.1Z","cx":657.1,"cy":670.6,"area":8.6},{"id":730600049,"name":"Mambaling","district":"South","d":"M703.3,1295.8L700.1,1285.6L681.2,1297.8L666.4,1298.8L665.2,1319.8L672.3,1342.2L684.0,1354.7L688.1,1349.0L716.9,1380.3L750.2,1343.7L748.5,1332.7L736.5,1321.4L736.3,1321.2L710.4,1311.9L703.1,1303.7L703.3,1295.8Z","cx":705.0,"cy":1332.8,"area":1.26},{"id":730600050,"name":"Pahina Central","district":"North","d":"M810.7,1294.5L801.0,1259.3L783.8,1262.3L763.0,1269.3L778.0,1277.5L787.9,1283.7L798.2,1297.0L810.7,1294.5Z","cx":792.0,"cy":1276.2,"area":0.26},{"id":730600051,"name":"Pahina San Nicolas","district":"South","d":"M798.2,1297.0L787.9,1283.7L778.0,1277.5L775.8,1279.2L781.1,1300.4L790.8,1298.3L798.2,1297.0Z","cx":785.2,"cy":1290.3,"area":0.08},{"id":730600052,"name":"Pamutan","district":"South","d":"M499.9,901.8L450.5,823.9L419.0,832.9L367.9,873.8L336.7,886.7L304.5,993.1L326.6,1042.0L411.8,1055.4L434.9,1092.7L538.1,1014.4L522.9,971.3L499.9,901.8Z","cx":420.5,"cy":961.3,"area":11.45},{"id":730600053,"name":"Pardo","district":"South","d":"M561.8,1373.9L548.5,1367.6L506.3,1312.4L448.4,1215.9L439.0,1224.8L414.0,1236.8L440.5,1286.7L470.9,1316.5L485.5,1322.3L501.6,1343.2L516.7,1366.0L520.5,1375.7L536.8,1398.3L545.8,1418.4L557.8,1401.8L561.8,1373.9Z","cx":485.9,"cy":1307.1,"area":2.05},{"id":730600054,"name":"Pari-an","district":"North","d":"M853.8,1250.4L839.3,1251.3L840.8,1257.2L829.5,1259.5L833.5,1267.7L853.7,1267.6L853.6,1260.1L853.8,1250.4Z","cx":844.0,"cy":1260.1,"area":0.09},{"id":730600055,"name":"Paril","district":"North","d":"M986.4,172.2L989.9,143.9L987.4,129.9L974.1,134.6L956.6,130.7L954.7,111.4L947.6,93.6L916.8,54.2L903.8,50.8L868.7,74.2L858.6,82.7L878.9,165.1L887.8,174.1L912.4,192.2L952.8,177.3L960.5,169.6L986.4,172.2Z","cx":917.8,"cy":125.7,"area":3.25},{"id":730600056,"name":"Pasil","district":"South","d":"M806.5,1321.2L798.2,1297.0L790.8,1298.3L791.2,1321.0L806.5,1321.2Z","cx":797.0,"cy":1310.7,"area":0.08},{"id":730600057,"name":"Pit-os","district":"North","d":"M983.1,671.0L979.0,616.4L983.2,599.8L967.7,571.7L978.5,537.8L961.2,542.4L944.1,550.1L937.9,549.2L930.9,560.7L924.3,549.3L918.3,552.3L917.0,565.8L903.6,573.4L919.4,584.0L927.7,600.4L945.1,605.5L932.8,629.5L941.4,634.4L939.2,645.7L947.7,653.5L961.4,657.4L958.4,667.7L983.1,671.0Z","cx":953.7,"cy":600.5,"area":1.64},{"id":730600059,"name":"Pulangbato","district":"North","d":"M918.3,552.3L861.3,523.8L838.5,553.5L824.3,598.0L808.7,600.2L802.5,615.2L791.2,618.6L786.1,628.1L804.9,631.7L792.6,692.4L804.6,709.0L869.7,682.3L922.0,674.5L941.5,674.3L956.9,673.0L958.4,667.7L961.4,657.4L947.7,653.5L939.2,645.7L941.4,634.4L932.8,629.5L945.1,605.5L927.7,600.4L919.4,584.0L903.6,573.4L917.0,565.8L918.3,552.3Z","cx":868.5,"cy":623.3,"area":5.29},{"id":730600060,"name":"Pung-ol Sibugay","district":"South","d":"M560.1,548.4L539.8,570.8L520.4,548.4L510.4,542.7L506.4,517.8L501.3,510.4L395.5,509.1L376.9,538.7L341.6,597.9L266.4,652.5L232.0,744.2L353.8,730.0L408.5,725.0L479.4,688.9L561.5,670.0L560.2,665.9L571.5,634.6L565.6,619.8L566.8,612.5L585.7,607.0L595.1,597.0L605.1,581.9L605.2,572.5L560.1,548.4Z","cx":420.9,"cy":629.0,"area":14.7},{"id":730600062,"name":"Punta Princesa","district":"South","d":"M700.1,1285.6L697.5,1275.7L687.1,1256.2L668.2,1258.6L652.2,1266.7L641.7,1261.0L629.3,1268.2L611.5,1268.0L599.7,1260.3L568.4,1276.3L580.6,1298.3L600.1,1299.9L616.1,1298.2L633.7,1304.0L666.4,1298.8L681.2,1297.8L700.1,1285.6Z","cx":637.0,"cy":1281.3,"area":1.28},{"id":730600063,"name":"Quiot Pardo","district":"South","d":"M580.6,1298.3L568.4,1276.3L532.9,1289.5L523.9,1296.7L546.1,1324.1L541.7,1335.6L547.3,1341.7L556.0,1333.4L564.5,1344.2L573.8,1351.2L581.6,1339.3L579.6,1332.5L584.4,1324.3L580.6,1298.3Z","cx":559.3,"cy":1311.0,"area":0.77},{"id":730600064,"name":"Sambag I","district":"North","d":"M799.6,1227.6L773.1,1231.6L759.3,1236.2L749.7,1236.1L746.6,1241.6L748.6,1253.0L763.0,1269.3L783.8,1262.3L801.0,1259.3L809.3,1255.1L803.4,1238.4L799.6,1227.6Z","cx":777.7,"cy":1247.6,"area":0.52},{"id":730600065,"name":"Sambag II","district":"North","d":"M799.6,1227.6L786.4,1190.4L756.6,1200.0L750.4,1218.0L754.8,1223.4L747.9,1230.0L749.7,1236.1L759.3,1236.2L773.1,1231.6L799.6,1227.6Z","cx":773.0,"cy":1215.1,"area":0.45},{"id":730600066,"name":"San Antonio","district":"North","d":"M834.9,1241.6L830.3,1230.2L818.7,1233.0L803.4,1238.4L809.3,1255.1L834.9,1241.6Z","cx":818.7,"cy":1241.5,"area":0.13},{"id":730600067,"name":"San Jose","district":"North","d":"M943.8,735.2L936.7,733.5L927.0,714.0L925.2,696.1L927.1,688.2L941.5,674.3L922.0,674.5L869.7,682.3L804.6,709.0L860.7,781.3L875.2,773.9L896.3,774.5L893.6,791.0L897.1,794.6L906.6,785.4L912.9,788.4L926.2,761.9L934.9,749.0L942.5,744.7L943.8,735.2Z","cx":881.9,"cy":728.1,"area":2.89},{"id":730600068,"name":"San Nicolas Proper","district":"South","d":"M734.3,1264.8L739.5,1273.0L743.0,1275.8L746.7,1296.4L762.9,1293.4L764.6,1302.7L775.4,1301.3L781.1,1300.4L775.8,1279.2L778.0,1277.5L763.0,1269.3L755.0,1270.1L734.3,1264.8Z","cx":760.3,"cy":1283.8,"area":0.28},{"id":730600069,"name":"San Roque","district":"North","d":"M890.7,1278.2L868.3,1262.6L853.6,1260.1L853.7,1267.6L852.8,1280.3L839.1,1313.6L838.9,1313.7L852.6,1308.3L874.3,1309.0L890.7,1278.2Z","cx":865.2,"cy":1287.3,"area":0.45},{"id":730600070,"name":"Santa Cruz","district":"North","d":"M818.7,1233.0L818.5,1221.8L797.3,1193.4L800.5,1185.9L786.4,1190.4L799.6,1227.6L803.4,1238.4L818.7,1233.0Z","cx":803.2,"cy":1214.4,"area":0.22},{"id":730600071,"name":"Sawang Calero","district":"South","d":"M775.4,1301.3L764.6,1302.7L762.9,1293.4L746.7,1296.4L745.1,1315.8L736.3,1321.2L736.5,1321.4L754.3,1321.7L754.3,1328.6L769.9,1328.3L776.8,1320.9L775.4,1301.3Z","cx":760.0,"cy":1312.1,"area":0.26},{"id":730600073,"name":"Sinsin","district":"South","d":"M189.6,886.9L117.6,852.4L42.6,839.8L4.7,851.0L40.8,936.0L39.1,1073.6L64.2,1071.2L122.9,1059.5L137.2,1042.1L140.5,1024.7L138.9,1004.7L143.1,986.6L193.5,929.9L189.6,886.9Z","cx":96.3,"cy":945.9,"area":8.18},{"id":730600074,"name":"Sirao","district":"North","d":"M808.7,600.2L808.0,574.0L799.2,531.7L735.0,501.4L654.2,441.3L624.2,448.6L602.3,474.2L594.2,493.4L578.7,506.2L577.5,523.8L568.2,539.5L560.1,548.4L605.2,572.5L786.1,628.1L791.2,618.6L802.5,615.2L808.7,600.2Z","cx":689.7,"cy":539.0,"area":7.75},{"id":730600075,"name":"Suba","district":"South","d":"M791.2,1321.0L790.8,1298.3L781.1,1300.4L775.4,1301.3L776.8,1320.9L791.2,1321.0Z","cx":783.7,"cy":1310.3,"area":0.09},{"id":730600076,"name":"Sudlon I","district":"South","d":"M214.5,830.7L2.4,778.2L2.3,830.6L4.7,851.0L42.6,839.8L117.6,852.4L189.6,886.9L211.7,844.4L214.5,830.7Z","cx":102.7,"cy":829.8,"area":3.23},{"id":730600077,"name":"Sapangdaku","district":"South","d":"M682.0,983.6L680.0,862.9L539.7,892.9L499.9,901.8L522.9,971.3L538.1,1014.4L584.7,1095.1L642.9,1061.0L664.2,1047.7L671.3,1040.4L682.3,1049.2L682.2,1042.2L676.1,1018.1L675.5,988.4L682.0,983.6Z","cx":603.9,"cy":968.3,"area":8.46},{"id":730600078,"name":"T. Padilla","district":"North","d":"M868.4,1215.0L861.5,1213.3L852.1,1226.3L855.1,1234.8L853.8,1250.4L870.5,1249.1L871.3,1239.7L868.4,1215.0Z","cx":862.4,"cy":1233.2,"area":0.16},{"id":730600079,"name":"Tabunan","district":"South","d":"M462.4,412.3L366.0,304.3L360.2,308.7L355.9,320.8L347.7,326.1L334.4,327.1L328.6,334.9L316.0,341.3L306.0,338.2L296.3,341.0L252.0,366.2L239.0,377.4L239.8,387.2L221.9,404.8L216.4,416.5L200.1,469.0L154.2,537.5L97.7,555.2L223.9,559.4L266.4,652.5L341.6,597.9L376.9,538.7L395.5,509.1L397.5,466.3L410.9,453.9L462.4,412.3Z","cx":304.9,"cy":471.6,"area":16.0},{"id":730600080,"name":"Tagbao","district":"South","d":"M659.5,185.9L552.1,114.9L539.3,129.1L439.1,250.7L430.4,248.6L421.2,258.2L398.8,286.5L379.8,291.2L373.9,301.7L366.0,304.3L462.4,412.3L519.0,357.6L524.3,353.5L537.8,353.1L559.1,276.1L659.5,185.9Z","cx":509.2,"cy":261.1,"area":10.62},{"id":730600081,"name":"Talamban","district":"North","d":"M999.0,774.9L983.5,785.5L980.3,774.3L968.3,761.9L964.0,753.1L961.0,735.1L943.8,735.2L942.5,744.7L934.9,749.0L926.2,761.9L912.9,788.4L906.6,785.4L897.1,794.6L893.6,791.0L896.3,774.5L875.2,773.9L860.7,781.3L875.0,805.1L881.5,818.7L873.4,849.4L871.5,875.5L863.2,879.8L854.2,891.4L864.7,901.5L885.9,917.8L927.9,926.8L949.5,880.9L959.1,866.7L970.8,857.6L993.5,851.4L988.8,842.8L989.3,821.4L980.6,814.2L1000.0,794.0L999.0,774.9Z","cx":926.4,"cy":833.5,"area":4.66},{"id":730600082,"name":"Taptap","district":"North","d":"M644.0,423.8L545.0,392.1L537.8,353.1L524.3,353.5L519.0,357.6L462.4,412.3L410.9,453.9L397.5,466.3L395.5,509.1L501.3,510.4L506.4,517.8L510.4,542.7L520.4,548.4L539.8,570.8L560.1,548.4L568.2,539.5L577.5,523.8L578.7,506.2L594.2,493.4L602.3,474.2L624.2,448.6L644.0,423.8Z","cx":517.8,"cy":459.9,"area":7.62},{"id":730600083,"name":"Tejero","district":"North","d":"M920.4,1240.5L892.4,1206.0L891.1,1209.4L872.9,1199.8L868.4,1215.0L871.3,1239.7L870.5,1249.1L893.5,1251.9L900.2,1261.4L903.8,1254.7L920.4,1240.5Z","cx":890.2,"cy":1231.1,"area":0.53},{"id":730600084,"name":"Tinago","district":"North","d":"M900.2,1261.4L893.5,1251.9L870.5,1249.1L853.8,1250.4L853.6,1260.1L868.3,1262.6L890.7,1278.2L900.2,1261.4Z","cx":878.8,"cy":1260.0,"area":0.23},{"id":730600085,"name":"Tisa","district":"South","d":"M671.8,1199.9L660.3,1201.9L649.6,1209.8L636.4,1207.4L637.5,1194.1L623.8,1193.2L617.6,1186.0L590.0,1185.5L576.5,1166.8L556.1,1144.9L533.6,1165.2L551.0,1195.4L565.7,1208.8L578.6,1227.5L593.5,1241.5L599.7,1260.3L611.5,1268.0L629.3,1268.2L641.7,1261.0L652.2,1266.7L668.2,1258.6L687.1,1256.2L679.8,1235.2L673.1,1225.9L670.8,1215.1L671.8,1199.9Z","cx":611.7,"cy":1216.4,"area":2.45},{"id":730600086,"name":"Toong","district":"South","d":"M434.9,1092.7L411.8,1055.4L326.6,1042.0L297.7,1070.5L319.0,1089.3L324.2,1101.4L322.1,1107.2L326.9,1122.4L321.4,1162.6L341.2,1218.2L353.9,1258.8L414.0,1236.8L439.0,1224.8L448.4,1215.9L463.8,1207.6L458.1,1153.4L434.9,1092.7Z","cx":384.0,"cy":1145.9,"area":6.86},{"id":730600087,"name":"Zapatera","district":"North","d":"M854.6,1183.1L841.5,1178.6L828.5,1177.6L826.7,1188.6L830.3,1230.2L841.1,1227.9L843.8,1239.0L852.1,1226.3L845.3,1213.5L854.6,1183.1Z","cx":839.2,"cy":1203.7,"area":0.33},{"id":730600088,"name":"Sudlon II","district":"South","d":"M266.4,652.5L223.9,559.4L97.7,555.2L0.0,694.0L2.4,778.2L214.5,830.7L265.4,774.7L232.0,744.2L266.4,652.5Z","cx":139.6,"cy":692.1,"area":16.22}]};
+const YEARS=[2013,2016,2019,2022,2025];
+// Sample-only citywide swings (positive = toward Rama)
+const SWING={2013:.18,2016:-.22,2019:.10,2022:.20,2025:-.12};
+const OTHER={2013:.02,2016:.02,2019:.03,2022:.06,2025:.18};
+const C={RAMA:'var(--rama)',BOPK:'var(--bopk)',SWING:'var(--swing)',NONE:'var(--none)',TIE:'var(--swing)'};
+const HEX={RAMA:'#4C8DF6',BOPK:'#E5484D',SWING:'#E9C217',NONE:'#6B7A90',TIE:'#E9C217'};
+const CLASSES=[['DH_RAMA','Die Hard Rama','RAMA','Rama camp won every cycle'],['DH_BOPK','Die Hard BOPK','BOPK','BOPK won every cycle'],['SWING','Swing','SWING','Winner changed between cycles'],['NONE','Insufficient history','NONE','Fewer than two cycles']];
+const clsColor=c=>({DH_RAMA:HEX.RAMA,DH_BOPK:HEX.BOPK,SWING:HEX.SWING,NONE:HEX.NONE})[c];
+
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const sig=x=>1/(1+Math.exp(-x));
+const W=GEO.W,H=GEO.H;
+const R0=rng(20250923);
+const blobs=[...Array(7)].map(()=>({x:R0()*W,y:R0()*H,s:(R0()*2-1)*1.1,r:250+R0()*400}));
+function lean(x,y){let v=.05;for(const b of blobs){const d=Math.hypot(x-b.x,y-b.y);v+=b.s*Math.exp(-(d*d)/(2*b.r*b.r))}return v}
+
+(function(){const raw=GEO.b.map(b=>{const r=rng(b.id*7+3);return lean(b.cx,b.cy)+(r()*2-1)*.5});const m=raw.reduce((a,x)=>a+x,0)/raw.length;const sd=Math.sqrt(raw.reduce((a,x)=>a+(x-m)**2,0)/raw.length)||1;GEO.b.forEach((b,i)=>b._lean=(raw[i]-m)/sd*.42+.02)})();
+const SCHOOL=['Elementary School','National High School','Barangay Hall','Integrated School','Covered Court','Day Care Center'];
+const B=GEO.b.map((b,i)=>{
+  const r=rng(b.id);
+  const urban=b.area<1.5?1:b.area<5?.6:.25;
+  const voters=Math.round(urban*(3500+r()*17000)+(1-urban)*(900+r()*2600));
+  const nP=Math.max(2,Math.round(voters/(760+r()*140)));
+  const L=b._lean;
+  const nPlaces=Math.max(1,Math.min(5,Math.round(nP/10)));
+  const places=[...Array(nPlaces)].map((_,k)=>`${b.name} ${SCHOOL[(k+Math.floor(r()*6))%SCHOOL.length]}`);
+  const precincts=[];
+  let left=voters;
+  for(let k=0;k<nP;k++){
+    const v=k===nP-1?left:Math.round(voters/nP*(.85+r()*.3));left-=v;
+    const pl=(r()*2-1)*.45;
+    const code='2217'+String(1000+i*70+k).slice(-4)+String.fromCharCode(65+(k%4));
+    const cycles=YEARS.map(y=>{
+      const rr=rng(b.id*31+k*7+y);
+      const reg=Math.round(v*(0.86+.04*YEARS.indexOf(y)));
+      const turn=.62+rr()*.2;
+      const cast=Math.round(reg*turn);
+      const oth=Math.round(cast*OTHER[y]*(.6+rr()*.8));
+      const share=sig((L+pl+SWING[y]+(rr()*2-1)*.18)*2.4);
+      const rama=Math.round((cast-oth)*share);
+      return {year:y,rama,bopk:cast-oth-rama,other:oth,reg,cast};
+    });
+    precincts.push({code,place:places[k%nPlaces],cycles});
+  }
+  return {...b,idx:i,voters,precincts};
+});
+function summarize(cycles){
+  return cycles.map(c=>{const t=c.rama+c.bopk;const w=t===0?null:c.rama>c.bopk?'RAMA':c.bopk>c.rama?'BOPK':'TIE';
+    const all=c.rama+c.bopk+c.other;const ow=c.other>Math.max(c.rama,c.bopk)?'OTHER':w;
+    return {...c,w,ow,margin:t?((c.rama-c.bopk)/t*100):0,turnout:c.reg?c.cast/c.reg*100:0,rp:all?c.rama/all*100:0,bp:all?c.bopk/all*100:0,op:all?c.other/all*100:0}});
+}
+function classify(s){const r=s.filter(c=>c.w);if(r.length<2)return'NONE';if(r.every(c=>c.w==='RAMA'))return'DH_RAMA';if(r.every(c=>c.w==='BOPK'))return'DH_BOPK';return'SWING'}
+const flips=s=>{let f=0;const r=s.filter(c=>c.w);for(let i=1;i<r.length;i++)if(r[i].w!==r[i-1].w)f++;return f};
+for(const b of B){
+  for(const p of b.precincts){p.s=summarize(p.cycles);p.cls=classify(p.s);p.flips=flips(p.s);p.reg=p.cycles.at(-1).reg}
+  const agg=YEARS.map((y,j)=>b.precincts.reduce((a,p)=>{const c=p.cycles[j];a.rama+=c.rama;a.bopk+=c.bopk;a.other+=c.other;a.reg+=c.reg;a.cast+=c.cast;return a},{year:y,rama:0,bopk:0,other:0,reg:0,cast:0}));
+  b.s=summarize(agg);b.cls=classify(b.s);b.flips=flips(b.s);b.reg=b.s.at(-1).reg;
+}
+
+// ---------- state ----------
+let mode='PATTERN';           // 'PATTERN' or a year
+let selected=null, selPrecinct=null, hidden=new Set(), chipFilter=null;
+const $=id=>document.getElementById(id);
+const svg=$('map'),vp=$('vp');
+
+function unitKey(u){if(mode==='PATTERN')return u.cls;const c=u.s.find(x=>x.year===mode);return c.w?c.w:'NONE'}
+function unitFill(u){if(mode==='PATTERN')return clsColor(u.cls);const c=u.s.find(x=>x.year===mode);return c.w?HEX[c.w]:HEX.NONE}
+function unitOpacity(u){if(mode==='PATTERN')return 1;const m=Math.abs(u.s.find(x=>x.year===mode).margin);return m<10?.4:m<25?.68:.95}
+function keysForMode(){return mode==='PATTERN'?CLASSES.map(c=>({k:c[0],label:c[1],color:clsColor(c[0]),desc:c[3]})):[{k:'RAMA',label:'Rama camp won',color:HEX.RAMA},{k:'BOPK',label:'BOPK won',color:HEX.BOPK},{k:'TIE',label:'Tie',color:HEX.TIE},{k:'NONE',label:'No result',color:HEX.NONE}]}
+const labelOf=k=>keysForMode().find(x=>x.k===k)?.label||k;
+const colorOf=k=>keysForMode().find(x=>x.k===k)?.color||HEX.NONE;
+const fmt=n=>n.toLocaleString('en-US');
+const pct=n=>(Math.round(n*10)/10).toFixed(1)+'%';
+
+// ---------- map ----------
+const NS='http://www.w3.org/2000/svg';
+const bg=$('bg');
+B.forEach(b=>{
+  const p=document.createElementNS(NS,'path');p.setAttribute('d',b.d);p.setAttribute('tabindex','0');p.setAttribute('role','button');p.setAttribute('aria-label',b.name);
+  p.dataset.i=b.idx;b.el=p;bg.appendChild(p);
+});
+requestAnimationFrame(()=>B.forEach(b=>{const bb=b.el.getBBox();b.bb=bb}));
+// graticule + context
+(function(){const g=$('grat');for(let x=0;x<=W;x+=125){const l=document.createElementNS(NS,'line');l.setAttribute('x1',x);l.setAttribute('x2',x);l.setAttribute('y1',-400);l.setAttribute('y2',H+400);g.appendChild(l)}
+for(let y=-375;y<=H+400;y+=125){const l=document.createElementNS(NS,'line');l.setAttribute('y1',y);l.setAttribute('y2',y);l.setAttribute('x1',-400);l.setAttribute('x2',W+400);g.appendChild(l)}
+const c=$('ctx');[['Balamban',-25,H*.3,'end'],['Consolacion',W*.8,-22,'middle'],['Mandaue',W+22,H*.66,'start'],['Mactan Channel',W+22,H*.8,'start'],['Talisay',W*.25,H+34,'middle']].forEach(([t,x,y,a])=>{const e=document.createElementNS(NS,'text');e.textContent=t;e.setAttribute('x',x);e.setAttribute('y',y);e.setAttribute('text-anchor',a);c.appendChild(e)})})();
+
+let view={x:-60,y:-40,w:W+120,h:H+80};
+function fit(){const r=svg.getBoundingClientRect();const ar=r.width/r.height;let w=W+140,h=H+80;if(w/h<ar)w=h*ar;else h=w/ar;return{x:(W-w)/2,y:(H-h)/2,w,h}}
+function setView(v){view=v;svg.setAttribute('viewBox',`${v.x} ${v.y} ${v.w} ${v.h}`);drawLabels()}
+let anim=null;
+function animateTo(t,ms=450){cancelAnimationFrame(anim);const f={...view},t0=performance.now();const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduce){setView(t);return}
+  const step=now=>{const k=Math.min(1,(now-t0)/ms),e=1-Math.pow(1-k,3);setView({x:f.x+(t.x-f.x)*e,y:f.y+(t.y-f.y)*e,w:f.w+(t.w-f.w)*e,h:f.h+(t.h-f.h)*e});if(k<1)anim=requestAnimationFrame(step)};anim=requestAnimationFrame(step)}
+function zoomTo(bb,pad=1.8,minW=160){const r=svg.getBoundingClientRect(),ar=r.width/r.height;let w=Math.max(bb.width*pad,minW),h=Math.max(bb.height*pad,minW/ar);if(w/h<ar)w=h*ar;else h=w/ar;animateTo({x:bb.x+bb.width/2-w/2,y:bb.y+bb.height/2-h/2,w,h})}
+function zoomBy(f,cx,cy){const v=view;cx??=v.x+v.w/2;cy??=v.y+v.h/2;const w=Math.min(Math.max(v.w*f,60),W*3),h=w*v.h/v.w;setView({x:cx-(cx-v.x)*w/v.w,y:cy-(cy-v.y)*h/v.h,w,h})}
+function toSvg(e){const r=svg.getBoundingClientRect();return{x:view.x+(e.clientX-r.left)/r.width*view.w,y:view.y+(e.clientY-r.top)/r.height*view.h}}
+svg.addEventListener('wheel',e=>{e.preventDefault();const p=toSvg(e);zoomBy(e.deltaY>0?1.15:1/1.15,p.x,p.y)},{passive:false});
+let drag=null,moved=false;
+svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,v:{...view}};moved=false});
+window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!moved&&Math.hypot(dx,dy)<4)return;moved=true;svg.classList.add('drag');const r=svg.getBoundingClientRect();setView({...drag.v,x:drag.v.x-dx/r.width*drag.v.w,y:drag.v.y-dy/r.height*drag.v.h})});
+window.addEventListener('pointerup',()=>{drag=null;svg.classList.remove('drag')});
+$('zin').onclick=()=>zoomBy(1/1.4);$('zout').onclick=()=>zoomBy(1.4);$('zreset').onclick=()=>animateTo(fit());
+$('zdown').onclick=()=>{const names=['Pari-an','Kamagayan','Tinago','Ermita','Pasil','Sambag I','Capitol Site','Lahug','Mabolo','Mambaling'];const bs=B.filter(b=>names.includes(b.name)).map(b=>b.bb);const x0=Math.min(...bs.map(b=>b.x)),y0=Math.min(...bs.map(b=>b.y)),x1=Math.max(...bs.map(b=>b.x+b.width)),y1=Math.max(...bs.map(b=>b.y+b.height));zoomTo({x:x0,y:y0,width:x1-x0,height:y1-y0},1.15)};
+
+function drawLabels(){const g=$('labels');if(!B[0].bb)return;const r=svg.getBoundingClientRect();const s=r.width/view.w;g.innerHTML='';$('ctx').querySelectorAll('text').forEach(t=>t.setAttribute('font-size',12/s));
+  B.forEach(b=>{const wpx=b.bb.width*s,hpx=b.bb.height*s;const fs=Math.min(13,Math.max(9,wpx/9));if(wpx<b.name.length*fs*.62||hpx<fs*1.6)return;
+    const t=document.createElementNS(NS,'text');t.textContent=b.name;t.setAttribute('x',b.cx);t.setAttribute('y',b.cy);t.setAttribute('font-size',fs/s);t.style.strokeWidth=(3/s)+'px';g.appendChild(t)})}
+
+const tip=$('tip');
+bg.addEventListener('pointermove',e=>{const i=e.target.dataset?.i;if(i==null){tip.style.display='none';return}const b=B[i];const c=mode==='PATTERN'?null:b.s.find(x=>x.year===mode);
+  tip.innerHTML=`<b>${b.name}</b><span class="m">${b.district} District</span><br>${mode==='PATTERN'?`${labelOf(b.cls)} · ${b.flips} flip${b.flips===1?'':'s'}`:`${labelOf(unitKey(b))} · margin ${c.margin>0?'Rama +':'BOPK +'}${pct(Math.abs(c.margin))}`}<br><span class="m">${fmt(b.reg)} voters · ${b.precincts.length} precincts</span>`;
+  tip.style.display='block';const x=e.clientX+14,y=e.clientY+14;tip.style.left=Math.min(x,innerWidth-tip.offsetWidth-8)+'px';tip.style.top=Math.min(y,innerHeight-tip.offsetHeight-8)+'px'});
+bg.addEventListener('pointerleave',()=>tip.style.display='none');
+bg.addEventListener('click',e=>{if(moved)return;const i=e.target.dataset?.i;if(i!=null)selectB(B[i],true)});
+bg.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.dataset?.i!=null){e.preventDefault();selectB(B[e.target.dataset.i],true)}});
+
+function paint(){B.forEach(b=>{b.el.setAttribute('fill',unitFill(b));b.el.style.fillOpacity=hidden.has(unitKey(b))?'':unitOpacity(b);b.el.classList.toggle('dim',hidden.has(unitKey(b)))});
+  $('sel').setAttribute('d',selected?selected.d:'');renderLegend()}
+
+// ---------- header modes ----------
+function renderModes(){const m=$('modes');m.innerHTML='';[['PATTERN','Pattern'],...YEARS.map(y=>[y,String(y)])].forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;if(v==='PATTERN')b.className='lbl';b.setAttribute('aria-pressed',mode===v);b.onclick=()=>{mode=v;hidden.clear();chipFilter=null;renderModes();paint();renderPanel()};m.appendChild(b)})}
+
+function renderLegend(){const L=$('legend');const counts={};B.forEach(b=>{const k=unitKey(b);counts[k]=(counts[k]||0)+1});
+  L.innerHTML=`<h3>${mode==='PATTERN'?'Voting pattern, 2013–2025':`${mode} mayoral result`}</h3>`+keysForMode().filter(k=>mode==='PATTERN'||counts[k.k]).map(k=>`<button data-k="${k.k}" aria-pressed="${!hidden.has(k.k)}"><span class="sw" style="background:${k.color}"></span>${k.label}<span class="n">${counts[k.k]||0}</span></button>`).join('')+`<small>${mode==='PATTERN'?'Click a class to isolate it.':'Deeper shade = wider margin.'}</small>`;
+  L.querySelectorAll('button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;const all=keysForMode().map(x=>x.k);
+    if(hidden.size===0||hidden.has(k)&&hidden.size===all.length-1&&false){hidden=new Set(all.filter(x=>x!==k))}else if(!hidden.has(k)&&hidden.size===all.length-1){hidden.clear()}else{hidden.has(k)?hidden.delete(k):hidden.add(k)}paint()})}
+
+// ---------- panel ----------
+const P=$('panel');
+function stackBar(title,items,unit){const tot=items.reduce((a,x)=>a+x.v,0)||1;return `<div class="bar"><div class="t"><span>${title}</span><b>${unit(tot)}</b></div><div class="stack">${items.map(x=>{const p=x.v/tot*100;return p>0?`<i style="width:${p}%;background:${x.c}" class="${x.c===HEX.SWING?'lt':''}" title="${x.l}: ${pct(p)}">${p>=7?Math.round(p)+'%':''}</i>`:''}).join('')}</div></div>`}
+function splits(units,val){const ks=keysForMode();return ks.map(k=>({l:k.label,c:k.color,v:units.filter(u=>unitKey(u)===k.k).reduce((a,u)=>a+val(u),0)}))}
+function divBars(s){const mx=Math.max(30,...s.map(c=>Math.abs(c.margin)));return `<div class="div">${s.map(c=>{const w=Math.abs(c.margin)/mx*50;return `<span>${c.year}</span><div class="track" title="${c.margin>0?'Rama':'BOPK'} +${pct(Math.abs(c.margin))}"><i style="${c.margin>=0?`left:50%;width:${w}%;background:${HEX.RAMA}`:`right:50%;width:${w}%;background:${HEX.BOPK}`}"></i></div>`}).join('')}<span></span><div class="ax"><span>← BOPK margin</span><span>Rama margin →</span></div></div>`}
+function cycleTable(s){return `<table><thead><tr><th>Year</th><th>Rama</th><th>BOPK</th><th>Other</th><th>Margin</th><th>Turnout</th></tr></thead><tbody>${s.map(c=>`<tr><td><span class="win" style="background:${c.w?HEX[c.w]:HEX.NONE}"></span>${c.year}</td><td>${pct(c.rp)}</td><td>${pct(c.bp)}</td><td>${pct(c.op)}</td><td>${c.margin>0?'R +':'B +'}${pct(Math.abs(c.margin))}</td><td>${pct(c.turnout)}</td></tr>`).join('')}</tbody></table>`}
+function badge(u){const k=unitKey(u);return `<span class="badge" style="background:${colorOf(k)};${k==='SWING'||k==='TIE'?'color:#1a1a1a':''}">${labelOf(k)}</span>`}
+function crumb(){return `<nav class="crumb" aria-label="Breadcrumb"><button data-go="city">Cebu City</button>${selected?` › ${selPrecinct?`<button data-go="brgy">${selected.name}</button> › <span>${selPrecinct.code}</span>`:`<span>${selected.name}</span>`}`:''}</nav>`}
+
+function renderPanel(){
+  if(selPrecinct)return renderPrecinct();
+  if(selected)return renderBrgy();
+  const allP=B.flatMap(b=>b.precincts);
+  const ks=keysForMode();
+  const north=B.filter(b=>b.district==='North'),south=B.filter(b=>b.district==='South');
+  const cnt=u=>1;
+  P.innerHTML=crumb()+`<h2>Citywide</h2><p class="sub">${mode==='PATTERN'?'Consistency of the mayoral vote across five elections.':`Head-to-head winner in the ${mode} mayoral race.`}</p>
+  <div class="stats"><div><b>80</b><span>barangays</span></div><div><b>${fmt(allP.length)}</b><span>precincts</span></div><div><b>${fmt(B.reduce((a,b)=>a+b.reg,0))}</b><span>voters (2025)</span></div><div><b>${Math.round(B.reduce((a,b)=>a+b.area,0))}</b><span>km² land area</span></div></div>
+  <section><h3>Share by ${mode==='PATTERN'?'pattern':'winner'}</h3>
+   ${stackBar('Barangays',splits(B,cnt),n=>fmt(n))}
+   ${stackBar('Precincts',splits(allP,cnt),n=>fmt(n))}
+   ${stackBar('Registered voters',splits(B,u=>u.reg),n=>fmt(n))}
+   ${stackBar('Land area',splits(B,u=>u.area),n=>Math.round(n)+' km²')}
+  </section>
+  <section><h3>By district <small>barangays</small></h3>
+   ${stackBar('North District',splits(north,cnt),n=>fmt(n))}
+   ${stackBar('South District',splits(south,cnt),n=>fmt(n))}
+  </section>
+  <section><h3>Areas by ${mode==='PATTERN'?'pattern':'winner'} <small>sorted by voters</small></h3>
+   ${ks.map(k=>{const list=B.filter(b=>unitKey(b)===k.k).sort((a,b)=>b.reg-a.reg);if(!list.length)return'';return `<details${k.k==='SWING'?' open':''}><summary><span class="sw" style="background:${k.color}"></span>${k.label}<span class="n">${list.length}</span></summary><div class="alist">${list.map(b=>`<button data-b="${b.idx}"><span>${b.name}</span><small>${fmt(b.reg)}</small></button>`).join('')}</div></details>`}).join('')}
+  </section>
+  <p class="note">Boundaries: PSGC 2023 barangay polygons. Votes, voters and precincts are generated sample data for testing the layout; replace with the pipeline output from the handoff. ${mode==='PATTERN'?'A barangay is Die Hard only if one camp won its combined precinct vote in every cycle.':''}</p>`;
+  wirePanel();
+}
+function renderBrgy(){const b=selected;const ks=keysForMode();const byK={};b.precincts.forEach(p=>{const k=unitKey(p);byK[k]=(byK[k]||0)+1});
+  const places=[...new Set(b.precincts.map(p=>p.place))];
+  P.innerHTML=crumb()+`<button class="back" data-go="city">← Citywide</button><h2>${b.name}</h2><p class="sub">${b.district} District · ${badge(b)}</p>
+  <div class="stats"><div><b>${fmt(b.reg)}</b><span>voters (2025)</span></div><div><b>${b.precincts.length}</b><span>precincts</span></div><div><b>${b.area<1?b.area.toFixed(2):b.area.toFixed(1)}</b><span>km²</span></div><div><b>${b.flips}</b><span>flips since 2013</span></div></div>
+  <section><h3>Mayoral vote by cycle</h3>${cycleTable(b.s)}${divBars(b.s)}</section>
+  <section><h3>Precincts <small>${mode==='PATTERN'?'by pattern':'by '+mode+' winner'}</small></h3>
+   <div class="chips">${ks.filter(k=>byK[k.k]).map(k=>`<button data-chip="${k.k}" aria-pressed="${chipFilter===k.k}"><span class="sw" style="background:${k.color}"></span>${k.label} ${byK[k.k]}</button>`).join('')}</div>
+   ${places.map(pl=>{const ps=b.precincts.filter(p=>p.place===pl&&(!chipFilter||unitKey(p)===chipFilter));if(!ps.length)return'';return `<div class="pp"><h4>${pl}</h4><div class="tiles">${ps.map(p=>{const k=unitKey(p);return `<button data-p="${p.code}" style="background:${unitFill(p)};opacity:${unitOpacity(p)}" class="${k==='SWING'||k==='TIE'?'lt':''}" title="${p.code} · ${labelOf(k)}">${p.code.slice(4)}</button>`}).join('')}</div></div>`}).join('')}
+  </section>`;
+  wirePanel();
+}
+function renderPrecinct(){const p=selPrecinct;
+  P.innerHTML=crumb()+`<button class="back" data-go="brgy">← ${selected.name}</button><h2>Precinct ${p.code}</h2><p class="sub">${p.place} · ${badge(p)}</p>
+  <div class="stats"><div><b>${fmt(p.reg)}</b><span>voters (2025)</span></div><div><b>${p.flips}</b><span>flips</span></div><div><b>${pct(p.s.at(-1).turnout)}</b><span>turnout 2025</span></div><div><b>${p.s.filter(c=>c.w).length}</b><span>cycles with results</span></div></div>
+  <section><h3>Mayoral vote by cycle</h3>${cycleTable(p.s)}${divBars(p.s)}</section>
+  <p class="note">In real data, clustered precinct codes often change between elections. A precinct is classified only on the cycles where its exact code appears.</p>`;
+  wirePanel();
+}
+function wirePanel(){P.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>{if(e.dataset.go==='city'){selected=null;selPrecinct=null;chipFilter=null;paint();animateTo(fit())}else{selPrecinct=null}renderPanel()});
+  P.querySelectorAll('[data-b]').forEach(e=>e.onclick=()=>selectB(B[e.dataset.b],true));
+  P.querySelectorAll('[data-chip]').forEach(e=>e.onclick=()=>{chipFilter=chipFilter===e.dataset.chip?null:e.dataset.chip;renderBrgy()});
+  P.querySelectorAll('[data-p]').forEach(e=>e.onclick=()=>{selPrecinct=selected.precincts.find(p=>p.code===e.dataset.p);renderPanel();P.scrollTop=0});
+}
+function selectB(b,zoom){selected=b;selPrecinct=null;chipFilter=null;paint();renderPanel();P.scrollTop=0;if(zoom&&b.bb)zoomTo(b.bb,2.2,170)}
+
+// ---------- search ----------
+const q=$('q'),qr=$('qres');
+q.addEventListener('input',()=>{const v=q.value.trim().toLowerCase();if(!v){qr.hidden=true;return}const m=B.filter(b=>b.name.toLowerCase().includes(v)).slice(0,8);
+  qr.innerHTML=m.length?m.map(b=>`<li><button data-b="${b.idx}">${b.name} <small style="color:var(--dim)">${b.district}</small></button></li>`).join(''):'<li style="padding:7px 10px;color:var(--dim)">No barangay by that name</li>';qr.hidden=false;
+  qr.querySelectorAll('button').forEach(e=>e.onclick=()=>{selectB(B[e.dataset.b],true);q.value='';qr.hidden=true})});
+q.addEventListener('keydown',e=>{if(e.key==='Enter'){qr.querySelector('button')?.click()}if(e.key==='Escape'){q.value='';qr.hidden=true}});
+
+addEventListener('resize',()=>{if(!selected)setView(fit());else drawLabels()});
+renderModes();paint();renderPanel();
+requestAnimationFrame(()=>requestAnimationFrame(()=>setView(fit())));
+</script>
+</body>
+</html>

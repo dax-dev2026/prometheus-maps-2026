@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<script>
+  if (sessionStorage.getItem('authenticated') !== 'true') {
+    const pwd = prompt('This app is password protected. Enter password:');
+    if (pwd === 'prometheus2026') {
+      sessionStorage.setItem('authenticated', 'true');
+    } else {
+      document.write('<div style="font-family: sans-serif; text-align: center; margin-top: 20vh;"><h1>Unauthorized</h1><p>Incorrect password.</p><button onclick="location.reload()">Try Again</button></div>');
+      window.stop();
+      throw new Error('Unauthorized');
+    }
+  }
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Santa Fe Bailiwick Map — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0B1220;--ink2:#0E1626;--panel:#121C2E;--panel2:#16223a;--line:#243450;--line2:#2f4364;
+  --mist:#8DA2C0;--dim:#5b6f8d;--paper:#E8EEF6;--signal:#35C0D0;--sea:#0a1830;--sea2:#0d1f3b;
+  --rama:#4C8DF6;--bopk:#E5484D;--swing:#E9C217;--none:#6B7A90;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --disp:'Space Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --body:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --ink:#EEF2F8;--ink2:#E4EAF3;--panel:#FFFFFF;--panel2:#F3F6FB;--line:#D3DCE8;--line2:#B9C6D8;
+    --mist:#4F6380;--dim:#7A8BA3;--paper:#0E1626;--signal:#0E8C9C;--sea:#DCE6F2;--sea2:#D2DEEC;--none:#9AA6B6;
+  }
+}
+:root[data-theme="light"]{
+  --ink:#EEF2F8;--ink2:#E4EAF3;--panel:#FFFFFF;--panel2:#F3F6FB;--line:#D3DCE8;--line2:#B9C6D8;
+  --mist:#4F6380;--dim:#7A8BA3;--paper:#0E1626;--signal:#0E8C9C;--sea:#DCE6F2;--sea2:#D2DEEC;--none:#9AA6B6;
+}
+:root[data-theme="dark"]{
+  --ink:#0B1220;--ink2:#0E1626;--panel:#121C2E;--panel2:#16223a;--line:#243450;--line2:#2f4364;
+  --mist:#8DA2C0;--dim:#5b6f8d;--paper:#E8EEF6;--signal:#35C0D0;--sea:#0a1830;--sea2:#0d1f3b;--none:#6B7A90;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh;height:100dvh}
+header{display:flex;align-items:center;gap:18px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--ink2);flex-wrap:wrap}
+.brand h1{font-family:var(--disp);font-weight:700;font-size:19px;margin:0;letter-spacing:.01em}
+.brand p{margin:0;color:var(--mist);font-size:12px}
+.sample{font-family:var(--mono);font-size:11px;color:var(--swing);border:1px dashed color-mix(in srgb,var(--swing) 60%,transparent);padding:3px 8px;border-radius:4px;white-space:nowrap}
+.seg{display:flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-left:auto}
+.seg button{background:transparent;border:0;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--mist);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--paper);box-shadow:inset 0 -2px 0 var(--signal)}
+.seg .lbl{font-family:var(--disp);font-weight:600}
+
+main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,1fr);min-height:0}
+.mapwrap{position:relative;min-height:0;background:radial-gradient(120% 90% at 70% 80%,var(--sea2),var(--sea));overflow:hidden;border-right:1px solid var(--line)}
+svg#map{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+svg#map.drag{cursor:grabbing}
+.bg path{stroke:var(--ink);stroke-width:.8;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill-opacity .2s,filter .2s}
+.bg path:hover{filter:brightness(1.18)}
+.bg path.dim{fill-opacity:.12}
+.sel{fill:none;stroke:var(--signal);stroke-width:3;vector-effect:non-scaling-stroke;pointer-events:none;filter:drop-shadow(0 0 6px var(--signal))}
+.labels text{font-family:var(--disp);font-weight:600;fill:#fff;paint-order:stroke;stroke:rgba(8,14,26,.7);stroke-width:3px;text-anchor:middle;pointer-events:none;dominant-baseline:middle}
+.grat line{stroke:var(--line);stroke-width:.6;vector-effect:non-scaling-stroke;opacity:.5}
+.ctx text{font-family:var(--body);font-style:italic;fill:var(--dim);pointer-events:none}
+.tools{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:6px}
+.tools button{width:34px;height:34px;border-radius:7px;background:var(--panel);border:1px solid var(--line2);cursor:pointer;font-size:16px;line-height:1}
+.tools button.wide{width:auto;padding:0 10px;font-size:12px}
+.search{position:absolute;top:12px;right:12px;width:min(240px,50%)}
+.search input{width:100%;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);background:var(--panel);color:var(--paper);font:inherit}
+.search ul{list-style:none;margin:4px 0 0;padding:0;background:var(--panel);border:1px solid var(--line2);border-radius:7px;max-height:220px;overflow:auto}
+.search li button{width:100%;text-align:left;background:none;border:0;padding:7px 10px;cursor:pointer}
+.search li button:hover,.search li button:focus{background:var(--panel2)}
+.legend{position:absolute;left:12px;bottom:12px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line2);border-radius:9px;padding:10px 12px;min-width:210px}
+.legend h3{margin:0 0 6px;font-family:var(--disp);font-size:13px;font-weight:600}
+.legend button{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 2px;cursor:pointer;text-align:left;border-radius:4px}
+.legend button[aria-pressed="false"]{opacity:.35}
+.legend .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--mist)}
+.legend small{display:block;color:var(--dim);font-size:11px;margin-top:6px}
+.sw{width:14px;height:14px;border-radius:3px;flex:none}
+.tip{position:fixed;pointer-events:none;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:10;display:none;min-width:170px}
+.tip b{font-family:var(--disp);font-size:14px;display:block}
+.tip .m{color:var(--mist)}
+
+aside{overflow:auto;min-height:0;background:var(--panel);padding:18px 20px 28px}
+.crumb{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--mist);margin-bottom:10px;flex-wrap:wrap}
+.crumb button{background:none;border:0;padding:0;color:var(--signal);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+h2{font-family:var(--disp);font-size:24px;line-height:1.15;margin:0 0 4px;font-weight:700}
+.sub{color:var(--mist);margin:0 0 16px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-weight:600;font-size:12.5px;color:#fff}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:14px 0 20px}
+.stats div{background:var(--panel2);padding:10px 12px}
+.stats b{display:block;font-family:var(--disp);font-size:20px;font-weight:600}
+.stats span{font-size:11.5px;color:var(--mist)}
+section{margin-bottom:22px}
+section>h3{font-family:var(--disp);font-size:15px;font-weight:600;margin:0 0 10px;display:flex;align-items:baseline;gap:8px}
+section>h3 small{font-family:var(--body);font-weight:400;color:var(--dim);font-size:12px}
+.bar{margin-bottom:10px}
+.bar .t{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mist);margin-bottom:4px}
+.bar .t b{color:var(--paper);font-weight:500}
+.stack{display:flex;height:22px;border-radius:5px;overflow:hidden;background:var(--line)}
+.stack i{display:flex;align-items:center;justify-content:center;font-style:normal;font-family:var(--mono);font-size:10.5px;color:#fff;min-width:0;overflow:hidden;white-space:nowrap}
+.stack i.lt{color:#1a1a1a}
+details{border-top:1px solid var(--line)}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{display:flex;align-items:center;gap:8px;padding:9px 2px;cursor:pointer;list-style:none;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary .n{margin-left:auto;color:var(--mist);font-family:var(--mono);font-size:12px}
+summary::after{content:"+";color:var(--dim);width:14px;text-align:center}
+details[open] summary::after{content:"–"}
+.alist{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:0 2px 10px}
+.alist button{background:none;border:0;text-align:left;padding:4px 6px;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;gap:6px;font-size:13px}
+.alist button:hover{background:var(--panel2)}
+.alist small{color:var(--dim);font-family:var(--mono);font-size:11px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:right;font-weight:500;color:var(--mist);padding:6px 6px;border-bottom:1px solid var(--line2)}
+td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+.win{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:1px}
+.div3{display:grid;grid-template-columns:40px 1fr auto;gap:4px 8px;align-items:center;font-size:11.5px;margin-top:10px}
+.div3 .stack3{display:flex;height:12px;border-radius:3px;overflow:hidden;background:var(--line)}
+.div3 .stack3 i{display:block;height:100%}
+.div3 .w3{color:var(--mist);font-size:10.5px;white-space:nowrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chips button{background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.chips button[aria-pressed="true"]{border-color:var(--signal)}
+.pp{margin-bottom:12px}
+.pp h4{margin:0 0 6px;font-size:12.5px;font-weight:500;color:var(--mist)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:5px}
+.tiles button{border:0;border-radius:5px;padding:7px 4px;font-family:var(--mono);font-size:11px;color:#fff;cursor:pointer;text-align:center}
+.tiles button.lt{color:#1a1a1a}
+.tiles button:hover{outline:2px solid var(--paper);outline-offset:-2px}
+.note{font-size:12px;color:var(--dim);border-left:2px solid var(--line2);padding-left:10px;margin-top:16px}
+.back{background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:6px 12px;cursor:pointer;margin-bottom:14px}
+
+@media (max-width:900px){
+  .app{height:auto}
+  main{grid-template-columns:1fr}
+  .mapwrap{height:68vh;border-right:0;border-bottom:1px solid var(--line)}
+  .seg{margin-left:0;overflow-x:auto;max-width:100%}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .legend{min-width:0}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><h1>Santa Fe bailiwick map</h1><p>Municipal mayoral race · Espinosa vs the field · 10 barangays</p></div>
+  <span class="sample" title="2025 is real, scraped Comelec precinct data. 2013–2022 are generated for layout testing. Barangay boundaries are real (PSGC 2023).">Mixed: 2025 real · earlier years sample</span>
+  <div class="seg" role="group" aria-label="Race" id="racesel"></div>
+  <div class="seg" role="group" aria-label="View" id="modes" style="margin-left:8px"></div>
+</header>
+<main>
+  <div class="mapwrap" id="mapwrap">
+    <svg id="map" role="img" aria-label="Map of Santa Fe barangays">
+      <g id="vp">
+        <g class="grat" id="grat"></g>
+        <g class="bg" id="bg"></g>
+        <path class="sel" id="sel" d=""/>
+        <g class="labels" id="labels"></g>
+        <g class="ctx" id="ctx"></g>
+      </g>
+    </svg>
+    <div class="tools">
+      <button id="zin" aria-label="Zoom in">+</button>
+      <button id="zout" aria-label="Zoom out">−</button>
+      <button id="zreset" aria-label="Show whole city">⤢</button>
+      <button id="zdown" class="wide" aria-label="Zoom to Poblacion">Poblacion</button>
+    </div>
+    <div class="search"><input id="q" type="search" placeholder="Find a barangay" aria-label="Find a barangay" autocomplete="off"><ul id="qres" hidden></ul></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <aside id="panel" aria-live="polite"></aside>
+</main>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const GEO = {"W":1000,"H":1455,"b":[{"id":702244002,"name":"Hagdan","d":"M977.2,213.1L978.4,211.2L978.7,209.6L981.9,205.1L983.8,203.0L985.7,201.6L986.4,200.7L989.5,199.0L990.2,197.2L991.8,194.5L992.8,194.1L994.3,190.5L995.3,189.1L995.5,187.7L996.3,186.6L997.3,183.9L997.7,183.1L998.4,180.1L998.2,178.3L999.2,177.2L998.4,175.5L998.5,174.5L998.1,174.0L998.4,172.9L998.1,172.3L998.7,170.1L999.3,168.6L998.9,167.6L999.9,166.8L999.6,165.2L999.4,163.1L999.9,162.7L998.8,161.1L999.1,159.7L998.3,158.1L998.8,156.8L999.1,154.6L998.3,153.4L998.1,152.1L998.3,150.3L997.8,148.5L998.8,147.1L999.8,145.0L1000.0,142.3L999.7,141.3L999.6,136.0L999.9,134.9L999.6,134.2L999.4,131.2L999.1,129.9L999.2,128.2L998.5,125.7L998.8,123.1L998.6,122.0L997.9,121.4L996.4,121.3L996.2,119.8L994.6,114.3L994.0,113.2L992.0,108.9L990.5,105.1L991.0,102.9L990.3,102.2L990.4,100.3L990.2,97.9L991.0,97.3L990.8,95.3L991.5,95.1L991.1,93.5L991.1,92.1L992.5,91.5L993.0,90.3L992.1,89.9L992.2,88.1L991.8,87.7L991.4,83.7L992.1,83.6L992.5,82.6L992.6,79.9L992.1,79.5L992.8,77.9L992.6,76.4L992.8,75.4L992.4,74.9L992.3,72.9L993.1,72.3L994.2,70.3L994.2,69.1L995.4,67.2L997.3,65.6L997.5,64.9L996.7,62.2L996.9,61.2L995.7,61.5L995.8,59.1L995.3,58.7L994.6,55.3L993.8,54.2L993.3,52.5L993.3,50.7L993.6,49.0L993.4,48.1L991.3,45.9L990.0,43.7L990.1,43.1L988.6,41.2L988.9,40.4L988.3,38.2L987.4,37.1L986.8,35.5L987.2,34.9L986.3,33.0L985.6,32.5L984.6,30.2L982.7,27.6L981.6,24.8L980.4,24.0L979.8,21.8L979.9,21.1L979.0,20.6L977.3,19.0L976.3,16.0L975.6,14.9L975.6,14.0L976.6,14.2L977.3,13.6L977.4,12.2L976.2,12.3L976.2,10.6L976.6,8.9L975.6,9.2L974.5,8.8L974.3,7.8L973.5,6.7L973.1,5.3L972.9,2.6L972.2,1.3L971.2,1.0L969.4,0.1L965.8,0.1L964.5,0.4L962.8,0.0L962.2,0.3L962.1,3.2L962.9,3.8L963.1,5.3L962.4,5.7L959.4,5.5L959.3,6.5L958.2,8.0L957.1,10.2L956.2,11.2L956.4,12.2L955.5,13.0L954.7,12.1L953.7,12.7L949.4,14.0L947.4,15.0L945.2,15.9L944.4,16.8L943.6,19.1L942.0,21.0L939.5,22.5L937.3,23.1L933.0,23.5L931.4,24.3L929.4,24.9L928.3,26.9L927.0,28.3L925.4,29.3L925.0,30.7L923.1,32.5L922.3,34.1L921.4,34.8L921.0,35.8L919.8,37.5L920.1,38.4L919.4,39.8L918.8,40.3L917.8,41.9L917.3,43.5L916.3,44.5L915.8,46.4L914.6,49.2L911.7,52.3L910.8,52.8L911.9,55.8L910.0,58.5L910.1,59.7L908.7,62.3L907.9,62.6L907.3,64.0L907.7,64.8L907.0,65.5L907.2,66.4L906.7,67.6L905.0,68.2L905.3,70.0L904.0,70.9L904.5,71.7L903.9,73.7L902.9,75.9L902.0,77.4L901.1,79.3L900.7,80.8L899.7,82.3L898.3,83.4L897.3,86.1L897.0,86.6L895.8,86.7L896.1,87.8L895.4,90.0L894.8,90.4L893.5,93.1L894.1,94.0L892.7,95.1L892.1,97.7L892.5,99.2L891.2,100.4L891.2,101.4L890.6,101.7L889.6,104.0L889.0,104.3L888.5,105.7L888.7,107.3L887.7,109.3L887.3,110.9L887.6,111.8L887.0,113.3L887.3,113.9L887.3,115.5L887.7,116.8L886.9,119.0L887.0,120.0L885.2,125.5L884.3,127.7L883.1,127.6L881.7,129.3L881.6,130.9L880.8,131.2L880.2,132.5L879.8,135.2L879.5,136.0L878.2,137.2L877.9,138.9L878.9,140.7L878.7,142.7L878.1,144.6L878.4,145.1L877.9,146.4L879.2,149.0L879.8,149.0L880.2,151.0L880.5,151.7L879.9,153.0L880.6,153.3L881.0,154.5L880.3,155.2L880.5,156.4L880.3,159.5L879.8,160.1L880.4,162.5L881.9,165.6L884.1,169.3L884.9,172.0L885.8,173.8L885.5,175.3L885.8,176.7L887.3,178.9L887.8,180.2L889.0,181.4L890.0,183.4L904.1,186.0L923.4,189.9L946.0,201.3L962.2,211.0L977.2,213.1Z","cx":945.9,"cy":115.6,"area":4.45},{"id":702244003,"name":"Hilantagaan","d":"M434.3,969.6L432.9,969.3L432.2,969.9L430.8,970.0L429.7,969.3L426.9,969.5L425.9,969.3L425.2,969.8L424.0,970.1L423.1,970.7L421.9,969.9L420.7,970.0L418.5,971.6L417.8,973.0L414.2,973.3L413.1,974.1L411.2,973.9L410.1,974.5L409.0,974.5L408.1,975.5L405.7,976.4L403.5,976.3L402.5,976.7L400.8,977.8L400.1,979.0L399.2,979.6L397.6,979.9L397.4,980.5L396.1,981.3L395.3,981.4L394.9,982.2L392.3,983.5L390.6,984.9L389.7,984.7L388.4,985.4L386.6,987.3L384.3,988.4L383.1,989.9L382.4,990.2L381.7,991.5L380.4,993.4L378.8,994.8L377.6,997.9L377.4,999.5L375.7,1002.7L374.8,1006.3L374.2,1007.0L374.4,1008.6L373.4,1012.1L373.5,1015.0L373.4,1017.3L373.6,1019.6L373.3,1022.1L373.4,1026.3L372.8,1030.7L372.8,1032.5L373.7,1034.6L374.1,1037.1L375.1,1038.5L375.5,1039.6L375.1,1040.7L373.8,1041.8L373.5,1042.9L373.5,1046.1L374.7,1049.6L375.6,1052.0L376.1,1054.4L376.7,1056.1L376.5,1056.8L377.6,1058.9L378.0,1060.5L378.0,1061.9L378.4,1062.4L379.1,1065.3L379.4,1068.2L379.7,1069.3L379.9,1071.4L380.8,1073.6L381.4,1076.4L381.9,1078.3L382.3,1080.4L382.8,1081.1L383.5,1084.1L385.2,1087.8L385.2,1089.9L385.0,1091.4L385.1,1093.5L384.7,1096.5L384.7,1099.0L384.5,1100.5L383.8,1102.2L381.3,1106.8L379.9,1109.6L378.1,1112.2L375.8,1114.5L374.3,1116.5L373.1,1117.9L372.4,1119.2L371.4,1121.7L370.5,1123.4L371.4,1125.1L371.9,1125.2L373.7,1124.7L376.2,1124.8L377.8,1125.0L380.4,1125.9L381.1,1126.4L381.5,1128.1L384.2,1129.1L385.0,1129.9L386.0,1132.5L386.1,1134.2L387.1,1134.9L392.0,1135.0L394.7,1136.0L395.3,1137.2L396.2,1137.8L397.7,1138.0L400.4,1139.5L400.9,1140.7L403.9,1141.4L407.1,1141.7L410.0,1142.7L413.6,1143.2L416.6,1143.8L422.6,1145.3L426.4,1146.0L429.5,1146.3L432.6,1146.3L435.0,1146.1L437.0,1145.3L444.3,1141.0L445.7,1141.3L448.9,1141.6L450.6,1141.2L453.4,1139.4L457.3,1135.1L458.0,1134.1L459.7,1132.8L461.9,1129.4L462.1,1128.4L463.4,1127.1L463.0,1126.7L464.1,1124.4L465.0,1121.9L466.0,1121.0L465.5,1119.7L465.4,1118.5L465.9,1117.8L466.2,1116.4L466.1,1112.0L466.4,1109.2L466.1,1108.4L466.7,1105.8L468.6,1100.6L469.5,1097.7L470.8,1095.8L472.6,1089.3L473.2,1086.3L474.9,1080.5L475.3,1080.0L476.9,1079.4L477.6,1077.9L479.0,1076.2L479.3,1075.2L480.2,1074.4L481.4,1074.3L482.1,1073.3L481.8,1071.8L481.9,1070.0L482.5,1067.0L483.2,1065.2L484.8,1064.2L485.6,1063.0L486.1,1061.5L487.2,1059.7L487.8,1058.2L488.2,1055.8L489.0,1053.8L489.3,1051.7L490.5,1050.0L491.2,1048.2L492.7,1045.9L494.7,1043.5L495.4,1042.2L494.8,1040.5L495.3,1038.4L495.8,1035.3L496.4,1034.0L496.4,1032.4L495.5,1030.7L494.6,1030.6L495.3,1028.2L495.7,1026.0L495.6,1024.8L495.0,1024.6L494.8,1023.3L493.0,1019.0L492.0,1015.7L491.8,1014.4L492.3,1013.8L490.9,1008.6L490.7,1004.3L490.3,1004.0L489.8,1002.0L488.5,999.6L488.3,998.4L487.3,996.9L486.7,994.0L485.4,993.0L483.6,992.2L483.8,991.4L482.9,990.6L482.0,988.5L480.3,987.0L479.2,985.6L478.1,983.1L477.4,982.5L476.0,982.0L475.1,980.6L473.9,979.8L472.3,980.2L469.0,978.2L466.2,977.1L464.1,976.1L461.6,975.1L458.5,974.2L454.8,973.6L451.5,972.8L448.8,972.4L447.1,971.8L445.3,971.6L444.0,970.7L443.1,970.9L441.1,970.4L438.9,970.4L434.3,969.6ZM233.2,934.5L231.5,934.7L230.2,936.7L229.3,938.9L228.5,939.2L227.9,940.4L227.1,940.3L226.2,941.2L224.5,941.9L221.7,942.9L218.0,944.4L216.4,944.5L216.0,945.1L214.2,945.4L213.5,946.4L214.8,949.5L216.3,951.0L218.5,954.8L219.8,956.3L221.4,957.3L222.1,957.0L223.2,957.6L224.9,961.2L225.1,963.3L224.5,964.4L224.4,965.6L225.0,966.5L227.5,968.3L228.5,969.2L229.5,971.0L230.9,971.3L231.7,971.9L232.2,973.2L232.3,974.3L233.9,975.0L235.7,975.2L236.9,974.9L238.7,973.8L241.8,972.7L244.8,973.2L245.8,973.7L247.6,974.0L252.1,974.2L253.0,974.5L256.6,974.8L259.8,974.6L260.7,975.0L263.7,973.9L264.7,973.7L265.3,973.1L266.7,972.6L268.3,970.7L269.7,969.7L271.4,967.1L271.1,964.8L271.3,964.0L270.5,963.4L270.1,962.3L268.9,965.6L267.6,965.3L264.6,965.2L264.5,963.8L263.8,962.8L263.7,961.7L262.7,961.1L262.9,959.3L262.2,958.6L263.7,956.5L264.7,955.8L264.7,954.3L263.7,952.9L261.3,951.9L261.0,950.2L260.5,949.7L259.2,950.3L257.9,949.8L256.7,948.7L255.8,948.2L254.3,947.0L254.0,947.4L250.5,946.5L249.8,944.6L249.0,943.3L247.2,943.0L246.9,941.9L245.0,941.3L243.1,939.8L242.9,939.2L241.2,938.2L239.5,938.1L234.3,936.1L233.5,935.4L233.2,934.5Z","cx":430.4,"cy":1053.5,"area":4.55},{"id":702244004,"name":"Kinatarkan","d":"M977.2,213.1L962.2,211.0L946.0,201.3L923.4,189.9L904.1,186.0L890.0,183.4L890.3,186.6L891.0,190.5L890.8,191.3L891.3,192.1L891.5,194.0L891.4,195.4L889.4,198.9L889.9,200.6L890.5,201.3L889.8,203.2L889.3,208.0L888.6,211.9L887.5,217.7L886.8,223.9L886.3,227.3L885.7,233.1L884.9,243.8L884.7,244.7L884.8,246.6L884.4,248.4L884.6,252.5L884.7,260.5L884.2,264.7L883.5,267.4L882.0,270.0L881.7,271.3L880.1,273.8L878.4,275.4L877.9,276.6L876.0,278.0L875.1,279.0L873.5,279.8L873.1,280.5L873.3,281.7L871.5,283.7L872.6,285.3L872.2,286.3L871.3,286.9L870.9,287.7L870.8,291.9L871.1,292.9L870.5,294.2L870.4,295.3L869.6,297.1L870.3,297.9L869.7,298.4L870.1,299.6L870.6,300.0L879.4,299.3L961.4,277.1L978.3,271.0L977.8,268.9L977.1,267.2L976.4,264.5L976.2,262.5L975.3,260.4L974.9,258.9L974.4,255.4L973.8,254.3L973.0,250.5L972.4,244.5L972.0,243.4L972.2,241.0L971.9,239.1L971.9,235.0L972.0,233.6L973.3,229.0L973.4,227.4L974.1,226.0L974.3,223.4L974.7,222.7L974.6,221.6L976.0,220.2L976.4,218.6L975.7,217.3L976.5,216.0L976.5,215.2L977.2,214.3L977.2,213.1Z","cx":923.8,"cy":243.2,"area":2.05},{"id":702244005,"name":"Langub","d":"M870.1,299.6L869.5,300.3L869.4,301.6L870.0,304.0L870.6,304.5L870.6,306.7L870.2,307.5L870.3,311.5L869.6,312.5L870.4,313.4L869.9,314.9L870.2,316.8L869.9,318.9L869.9,319.8L869.0,322.7L869.2,323.2L868.7,324.6L869.3,326.3L869.6,329.9L869.3,331.1L867.9,331.9L868.2,334.1L867.9,334.8L868.9,336.2L869.2,337.4L870.6,339.5L872.8,340.8L873.0,343.9L872.8,346.2L872.4,349.1L872.2,351.3L872.2,356.4L872.6,362.0L873.6,366.5L875.2,370.4L878.9,376.8L880.3,378.9L882.9,381.6L886.1,384.7L889.8,387.5L892.5,388.5L893.1,390.2L895.5,394.0L895.6,395.5L896.9,396.4L897.9,397.8L898.0,398.8L899.3,399.7L899.2,400.7L900.6,401.8L902.6,401.3L903.4,401.3L904.0,400.6L905.4,400.1L909.2,400.3L909.5,400.7L911.0,400.3L913.1,400.6L915.3,400.0L916.6,400.1L917.8,399.2L921.0,398.9L921.9,398.3L922.9,396.2L923.9,396.2L924.5,395.4L925.9,394.6L926.2,393.7L926.9,393.1L926.9,391.5L927.6,391.2L928.2,392.3L929.5,390.8L928.9,389.6L929.9,387.7L930.5,387.3L932.8,386.6L934.0,386.0L935.3,384.7L935.8,383.9L937.1,383.2L938.0,381.9L940.5,381.1L942.3,379.6L943.4,379.5L945.0,378.7L945.5,377.0L947.7,375.5L948.7,374.3L948.7,372.5L949.0,371.5L951.8,366.8L956.0,363.0L960.6,359.3L963.2,357.7L964.7,356.0L966.8,353.0L968.9,349.3L972.4,345.0L974.5,341.9L975.0,340.8L976.9,335.2L978.5,331.2L978.9,328.5L979.0,325.6L978.8,323.2L978.1,320.4L977.2,317.9L976.3,316.2L975.7,314.4L974.7,312.4L972.8,307.2L972.2,305.9L971.1,301.2L972.1,298.7L972.0,297.8L972.7,295.8L973.3,294.9L973.9,292.7L975.7,288.5L976.3,288.0L976.7,285.8L978.1,281.1L978.6,280.2L978.9,278.7L979.8,277.5L979.8,274.4L978.3,271.0L961.4,277.1L879.4,299.3L870.6,300.0L870.1,299.6Z","cx":922.8,"cy":334.8,"area":2.45},{"id":702244006,"name":"Maricaban","d":"M123.7,1342.9L117.4,1336.1L110.4,1330.3L100.8,1324.3L93.6,1320.6L89.3,1319.3L79.5,1317.0L72.8,1315.5L69.2,1315.4L67.6,1315.1L51.3,1314.8L39.3,1314.8L37.6,1314.7L17.1,1371.9L0.4,1416.9L0.0,1418.8L3.0,1419.0L6.8,1418.9L7.6,1419.3L8.7,1419.1L11.7,1419.5L16.7,1419.6L16.6,1422.2L16.7,1423.9L17.3,1424.3L19.0,1424.5L19.2,1425.8L20.5,1426.5L21.7,1425.2L23.1,1424.2L23.5,1425.4L24.9,1424.9L28.0,1424.7L28.5,1425.6L29.4,1425.9L29.9,1425.0L31.7,1425.5L34.4,1424.4L34.8,1425.9L35.3,1426.5L37.6,1426.7L39.1,1425.6L39.6,1425.6L39.9,1424.4L39.8,1422.8L37.9,1422.7L37.3,1423.1L36.2,1422.7L36.3,1421.8L35.1,1421.7L33.6,1422.4L32.9,1422.3L32.3,1421.2L31.2,1421.0L30.2,1420.4L35.1,1420.9L38.5,1421.1L42.2,1421.1L45.5,1421.7L47.2,1422.1L52.9,1422.5L54.8,1422.5L58.0,1422.7L60.1,1422.7L62.9,1423.3L67.1,1423.8L68.0,1424.1L77.4,1425.1L81.9,1425.7L88.8,1426.1L95.1,1427.0L97.2,1427.5L98.9,1427.6L102.3,1428.2L107.6,1428.6L112.1,1429.7L114.8,1430.2L117.1,1430.9L119.0,1432.4L120.7,1433.0L123.1,1435.4L124.0,1437.0L123.6,1438.0L123.6,1439.3L121.6,1440.3L121.2,1440.8L121.2,1442.5L119.7,1442.8L118.4,1444.0L117.9,1444.9L117.5,1446.8L118.6,1447.2L118.6,1448.2L120.6,1447.8L122.5,1449.4L127.9,1450.1L128.9,1450.7L130.8,1450.7L132.5,1451.0L133.2,1451.6L134.9,1451.6L135.3,1452.0L137.7,1452.6L140.4,1452.8L140.8,1452.6L142.0,1453.3L142.6,1452.7L143.9,1453.1L149.0,1453.2L154.3,1453.8L157.3,1454.0L162.4,1454.7L164.0,1454.3L168.2,1454.6L169.0,1454.5L171.3,1454.9L173.4,1454.7L174.5,1454.2L176.3,1454.6L181.3,1454.5L182.9,1454.0L184.1,1454.1L185.4,1453.4L188.4,1453.0L191.8,1453.2L197.3,1440.1L197.7,1434.2L199.3,1433.0L200.4,1431.0L201.5,1429.6L203.4,1429.0L204.8,1427.6L205.6,1426.1L206.2,1425.7L205.4,1424.2L205.3,1421.5L205.6,1419.4L205.6,1417.9L204.2,1408.3L203.5,1404.7L202.5,1400.7L201.2,1397.1L199.7,1395.1L199.3,1394.0L199.2,1392.5L199.5,1389.9L199.4,1387.5L199.2,1385.6L199.8,1382.3L194.5,1380.9L190.4,1380.2L182.9,1378.5L165.2,1374.9L160.2,1373.2L154.3,1370.4L148.6,1366.7L145.8,1364.7L137.0,1357.6L134.2,1354.7L128.8,1348.5L123.7,1342.9Z","cx":102.6,"cy":1388.5,"area":4.4},{"id":702244007,"name":"Okoy","d":"M322.6,1284.2L321.8,1281.0L321.0,1279.0L319.0,1275.9L314.3,1272.1L313.0,1270.4L310.7,1268.3L309.0,1266.1L305.9,1263.0L304.9,1261.1L301.1,1257.5L298.1,1255.5L296.6,1254.3L293.0,1252.3L288.7,1250.4L285.0,1248.2L280.8,1246.5L280.0,1246.4L276.5,1245.0L271.2,1242.7L270.6,1241.9L268.1,1240.7L266.2,1239.9L265.1,1239.2L263.6,1238.9L261.0,1238.1L257.2,1236.2L254.0,1235.2L252.4,1234.5L250.1,1234.4L245.5,1232.8L241.5,1231.1L240.4,1230.5L239.8,1229.4L240.3,1228.0L239.6,1227.5L239.8,1226.0L238.7,1225.1L238.0,1225.0L236.3,1223.9L235.6,1222.8L235.2,1221.5L215.1,1245.2L170.5,1294.6L140.8,1327.4L123.7,1342.9L128.8,1348.5L134.2,1354.7L137.0,1357.6L145.8,1364.7L148.6,1366.7L154.3,1370.4L160.2,1373.2L165.2,1374.9L182.9,1378.5L190.4,1380.2L194.5,1380.9L199.8,1382.3L211.0,1374.6L264.0,1339.1L279.2,1356.4L305.7,1345.8L303.1,1340.2L299.2,1332.4L296.9,1326.9L284.4,1301.0L308.7,1290.1L318.2,1285.5L321.4,1283.4L321.9,1284.5L322.6,1284.2Z","cx":226.1,"cy":1308.8,"area":4.19},{"id":702244008,"name":"Poblacion","d":"M356.8,1409.5L355.2,1407.7L346.8,1397.8L338.8,1386.6L334.8,1380.6L330.7,1374.4L325.2,1366.0L320.4,1358.2L318.7,1355.3L313.9,1342.9L305.7,1345.8L279.2,1356.4L293.4,1373.2L299.5,1380.9L302.5,1382.8L308.3,1389.2L314.2,1398.4L316.5,1401.8L320.2,1407.2L324.1,1413.0L325.5,1415.6L326.5,1418.9L325.1,1419.3L327.5,1418.6L329.1,1417.9L331.5,1417.4L335.2,1417.4L336.9,1417.0L339.2,1416.9L343.2,1416.3L345.8,1415.3L348.6,1415.1L349.4,1414.5L351.4,1412.3L352.7,1411.3L355.5,1410.4L356.8,1409.5Z","cx":318.4,"cy":1381.2,"area":0.59},{"id":702244009,"name":"Balidbid","d":"M235.2,1221.5L235.9,1220.5L236.9,1219.8L236.9,1219.2L235.6,1217.6L235.0,1217.8L233.8,1216.9L232.6,1216.6L232.4,1215.6L232.9,1214.9L231.9,1213.4L231.0,1212.8L230.5,1211.8L228.1,1210.4L226.1,1208.7L224.8,1208.3L223.7,1209.3L221.8,1208.4L216.7,1206.5L215.1,1206.0L213.8,1205.3L212.8,1205.4L209.3,1204.5L205.4,1201.5L203.1,1201.5L201.4,1204.1L198.7,1205.3L198.7,1208.1L207.3,1214.0L211.8,1216.8L215.8,1219.6L216.7,1222.6L216.8,1226.9L213.7,1229.1L207.9,1229.0L203.2,1228.1L196.5,1225.0L191.0,1222.1L186.8,1218.8L179.7,1213.6L172.1,1208.2L170.7,1204.7L166.4,1198.6L163.3,1196.4L159.9,1194.2L157.6,1192.3L137.9,1200.6L73.1,1227.1L37.6,1314.7L39.3,1314.8L51.3,1314.8L67.6,1315.1L69.2,1315.4L72.8,1315.5L79.5,1317.0L89.3,1319.3L93.6,1320.6L100.8,1324.3L110.4,1330.3L117.4,1336.1L123.7,1342.9L140.8,1327.4L170.5,1294.6L215.1,1245.2L235.2,1221.5Z","cx":129.9,"cy":1263.1,"area":3.88},{"id":702244010,"name":"Pooc","d":"M279.2,1356.4L264.0,1339.1L211.0,1374.6L199.8,1382.3L199.2,1385.6L199.4,1387.5L199.5,1389.9L199.2,1392.5L199.3,1394.0L199.7,1395.1L201.2,1397.1L202.5,1400.7L203.5,1404.7L204.2,1408.3L205.6,1417.9L205.6,1419.4L205.3,1421.5L205.4,1424.2L206.2,1425.7L205.6,1426.1L204.8,1427.6L203.4,1429.0L201.5,1429.6L200.4,1431.0L199.3,1433.0L197.7,1434.2L197.3,1440.1L191.8,1453.2L193.4,1452.1L194.6,1451.7L195.5,1452.1L198.4,1452.4L199.3,1452.7L201.2,1452.4L201.8,1452.6L204.1,1452.5L205.4,1451.7L207.9,1451.4L211.6,1450.8L213.3,1449.8L215.3,1450.0L217.9,1449.8L221.2,1449.4L223.3,1449.2L224.2,1448.9L227.3,1448.5L229.6,1448.5L231.3,1447.7L232.4,1447.7L236.3,1446.9L238.3,1446.2L241.9,1446.0L243.2,1445.6L244.9,1444.6L247.3,1444.0L248.0,1443.3L250.2,1442.8L250.8,1442.0L252.0,1441.6L253.0,1440.8L255.4,1435.8L254.9,1435.5L253.6,1438.5L253.2,1437.4L252.5,1436.7L252.8,1434.6L253.3,1433.9L254.0,1431.6L255.2,1430.2L256.0,1429.7L256.9,1427.3L257.5,1425.4L258.1,1424.5L259.1,1424.1L263.1,1423.9L264.1,1423.6L265.6,1423.9L271.9,1424.1L273.1,1424.4L277.0,1424.6L280.1,1425.0L281.2,1424.9L283.5,1424.2L284.4,1424.1L286.7,1424.3L291.7,1424.5L297.1,1425.5L300.9,1425.3L305.1,1424.7L309.1,1423.8L312.5,1422.5L321.3,1420.1L325.1,1419.3L326.5,1418.9L325.5,1415.6L324.1,1413.0L320.2,1407.2L316.5,1401.8L314.2,1398.4L308.3,1389.2L302.5,1382.8L299.5,1380.9L293.4,1373.2L279.2,1356.4Z","cx":252.5,"cy":1399.6,"area":2.08},{"id":702244011,"name":"Talisay","d":"M322.6,1284.2L321.9,1284.5L321.4,1283.4L318.2,1285.5L308.7,1290.1L284.4,1301.0L296.9,1326.9L299.2,1332.4L303.1,1340.2L305.7,1345.8L313.9,1342.9L318.7,1355.3L320.4,1358.2L325.2,1366.0L330.7,1374.4L334.8,1380.6L338.8,1386.6L346.8,1397.8L355.2,1407.7L356.8,1409.5L358.8,1407.7L360.1,1405.5L360.4,1403.7L360.3,1401.1L359.9,1400.0L358.9,1396.5L358.1,1395.1L356.8,1393.7L355.9,1391.4L353.7,1384.6L352.4,1382.3L351.6,1381.1L351.1,1379.4L350.5,1376.0L350.3,1372.0L350.3,1370.5L349.4,1367.8L347.3,1363.1L346.1,1361.0L344.0,1355.6L340.8,1348.3L339.0,1343.4L338.5,1342.2L337.0,1340.0L334.3,1334.0L334.0,1332.6L334.2,1331.4L335.7,1330.7L334.3,1326.9L334.9,1324.7L338.9,1322.9L339.2,1323.6L340.7,1323.0L340.5,1322.4L342.3,1321.4L347.9,1319.1L347.8,1318.8L350.5,1317.6L350.3,1316.9L348.1,1317.7L348.8,1314.8L348.4,1314.2L347.3,1318.0L345.1,1318.6L342.0,1319.6L340.2,1317.9L337.8,1314.5L336.7,1312.8L334.6,1308.5L332.5,1305.6L331.5,1303.6L330.6,1301.4L328.5,1297.3L324.1,1287.6L323.2,1286.4L322.6,1284.2Z","cx":323.2,"cy":1335.3,"area":0.84}]};
+const YEARS=[2013,2016,2019,2022,2025];
+const REAL25=[{"code":"22440001","barangay":"Poblacion","espinosa":312,"esgana":297,"other":13,"reg":747,"cast":638},{"code":"22440002","barangay":"Poblacion","espinosa":354,"esgana":241,"other":12,"reg":748,"cast":616},{"code":"22440003","barangay":"Poblacion","espinosa":453,"esgana":171,"other":4,"reg":747,"cast":647},{"code":"22440004","barangay":"Balidbid","espinosa":329,"esgana":318,"other":7,"reg":744,"cast":677},{"code":"22440005","barangay":"Balidbid","espinosa":407,"esgana":225,"other":3,"reg":743,"cast":663},{"code":"22440006","barangay":"Hagdan","espinosa":347,"esgana":280,"other":2,"reg":750,"cast":656},{"code":"22440007","barangay":"Hagdan","espinosa":305,"esgana":294,"other":1,"reg":749,"cast":631},{"code":"22440008","barangay":"Hagdan","espinosa":326,"esgana":277,"other":2,"reg":748,"cast":626},{"code":"22440009","barangay":"Hilantagaan","espinosa":377,"esgana":209,"other":5,"reg":712,"cast":612},{"code":"22440010","barangay":"Hilantagaan","espinosa":356,"esgana":258,"other":3,"reg":712,"cast":646},{"code":"22440011","barangay":"Hilantagaan","espinosa":350,"esgana":246,"other":0,"reg":712,"cast":617},{"code":"22440012","barangay":"Hilantagaan","espinosa":361,"esgana":239,"other":0,"reg":712,"cast":622},{"code":"22440013","barangay":"Kinatarkan","espinosa":347,"esgana":126,"other":1,"reg":593,"cast":487},{"code":"22440014","barangay":"Kinatarkan","espinosa":385,"esgana":81,"other":3,"reg":594,"cast":490},{"code":"22440015","barangay":"Langub","espinosa":380,"esgana":250,"other":1,"reg":784,"cast":648},{"code":"22440016","barangay":"Langub","espinosa":454,"esgana":179,"other":1,"reg":784,"cast":654},{"code":"22440017","barangay":"Maricaban","espinosa":379,"esgana":222,"other":4,"reg":740,"cast":626},{"code":"22440018","barangay":"Maricaban","espinosa":339,"esgana":268,"other":4,"reg":740,"cast":630},{"code":"22440019","barangay":"Maricaban","espinosa":386,"esgana":238,"other":4,"reg":740,"cast":646},{"code":"22440020","barangay":"Maricaban","espinosa":364,"esgana":278,"other":3,"reg":741,"cast":668},{"code":"22440021","barangay":"Okoy","espinosa":362,"esgana":262,"other":4,"reg":744,"cast":656},{"code":"22440022","barangay":"Okoy","espinosa":380,"esgana":239,"other":3,"reg":745,"cast":643},{"code":"22440023","barangay":"Okoy","espinosa":414,"esgana":198,"other":2,"reg":743,"cast":640},{"code":"22440024","barangay":"Okoy","espinosa":442,"esgana":191,"other":6,"reg":744,"cast":659},{"code":"22440025","barangay":"Pooc","espinosa":587,"esgana":118,"other":4,"reg":814,"cast":718},{"code":"22440026","barangay":"Pooc","espinosa":595,"esgana":89,"other":6,"reg":814,"cast":700},{"code":"22440027","barangay":"Pooc","espinosa":565,"esgana":117,"other":3,"reg":814,"cast":696},{"code":"22440028","barangay":"Talisay","espinosa":250,"esgana":452,"other":9,"reg":874,"cast":732},{"code":"22440029","barangay":"Talisay","espinosa":328,"esgana":379,"other":4,"reg":865,"cast":739},{"code":"22440030","barangay":"Talisay","espinosa":528,"esgana":274,"other":1,"reg":949,"cast":823}]; // actual 2025 Comelec precinct results for Santa Fe mayor (Espinosa vs Esgana vs Salise)
+const GOYANG_P=[{"code":"22440001","barangay":"Poblacion","votes":275,"rank":9,"n":16},{"code":"22440002","barangay":"Poblacion","votes":309,"rank":7,"n":16},{"code":"22440003","barangay":"Poblacion","votes":400,"rank":4,"n":16},{"code":"22440004","barangay":"Balidbid","votes":303,"rank":8,"n":16},{"code":"22440005","barangay":"Balidbid","votes":357,"rank":6,"n":16},{"code":"22440006","barangay":"Hagdan","votes":327,"rank":7,"n":16},{"code":"22440007","barangay":"Hagdan","votes":295,"rank":7,"n":16},{"code":"22440008","barangay":"Hagdan","votes":318,"rank":7,"n":16},{"code":"22440009","barangay":"Hilantagaan","votes":332,"rank":6,"n":16},{"code":"22440010","barangay":"Hilantagaan","votes":332,"rank":6,"n":16},{"code":"22440011","barangay":"Hilantagaan","votes":286,"rank":8,"n":16},{"code":"22440012","barangay":"Hilantagaan","votes":309,"rank":7,"n":16},{"code":"22440013","barangay":"Kinatarkan","votes":310,"rank":4,"n":16},{"code":"22440014","barangay":"Kinatarkan","votes":331,"rank":5,"n":16},{"code":"22440015","barangay":"Langub","votes":336,"rank":7,"n":16},{"code":"22440016","barangay":"Langub","votes":401,"rank":4,"n":16},{"code":"22440017","barangay":"Maricaban","votes":316,"rank":9,"n":16},{"code":"22440018","barangay":"Maricaban","votes":294,"rank":9,"n":16},{"code":"22440019","barangay":"Maricaban","votes":337,"rank":9,"n":16},{"code":"22440020","barangay":"Maricaban","votes":356,"rank":9,"n":16},{"code":"22440021","barangay":"Okoy","votes":328,"rank":7,"n":16},{"code":"22440022","barangay":"Okoy","votes":301,"rank":6,"n":16},{"code":"22440023","barangay":"Okoy","votes":368,"rank":7,"n":16},{"code":"22440024","barangay":"Okoy","votes":359,"rank":7,"n":16},{"code":"22440025","barangay":"Pooc","votes":551,"rank":1,"n":16},{"code":"22440026","barangay":"Pooc","votes":552,"rank":1,"n":16},{"code":"22440027","barangay":"Pooc","votes":529,"rank":2,"n":16},{"code":"22440028","barangay":"Talisay","votes":203,"rank":13,"n":16},{"code":"22440029","barangay":"Talisay","votes":271,"rank":12,"n":16},{"code":"22440030","barangay":"Talisay","votes":432,"rank":6,"n":16}], GOYANG_B=[{"barangay":"Balidbid","votes":660,"rank":6,"n":16},{"barangay":"Hagdan","votes":940,"rank":7,"n":16},{"barangay":"Hilantagaan","votes":1259,"rank":7,"n":16},{"barangay":"Kinatarkan","votes":641,"rank":4,"n":16},{"barangay":"Langub","votes":737,"rank":5,"n":16},{"barangay":"Maricaban","votes":1303,"rank":9,"n":16},{"barangay":"Okoy","votes":1356,"rank":7,"n":16},{"barangay":"Poblacion","votes":984,"rank":6,"n":16},{"barangay":"Pooc","votes":1632,"rank":1,"n":16},{"barangay":"Talisay","votes":906,"rank":12,"n":16}]; // Espinosa, Goyang's real 2025 councilor rank (of 16 candidates), by precinct and by barangay
+// Sample-only swings for the illustrative years (positive = toward Espinosa). 2016 is nudged to match the real, on-record Espinosa win.
+const SWING={2013:.05,2016:.30,2019:-.08,2022:.12,2025:null};
+const REG_FACTOR={2013:.80,2016:.85,2019:.90,2022:.95,2025:1};
+const C={RAMA:'var(--rama)',BOPK:'var(--bopk)',OTH:'#9B6BDF',SWING:'var(--swing)',NONE:'var(--none)',TIE:'var(--swing)'};
+const HEX={RAMA:'#4C8DF6',BOPK:'#E5484D',OTH:'#9B6BDF',SWING:'#E9C217',NONE:'#6B7A90',TIE:'#E9C217',TOP3:'#2FBE6B',OUT:'#E0703C'};
+const CLASSES=[['DH_RAMA','Die Hard Espinosa','RAMA','Espinosa\u2019s camp won every cycle'],['DH_BOPK','Die Hard Opposition','BOPK','Espinosa never won'],['SWING','Swing','SWING','Control changed hands between cycles'],['NONE','Insufficient history','NONE','Fewer than two cycles']];
+const clsColor=c=>({DH_RAMA:HEX.RAMA,DH_BOPK:HEX.BOPK,SWING:HEX.SWING,NONE:HEX.NONE})[c];
+
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const sig=x=>1/(1+Math.exp(-x));
+const W=GEO.W,H=GEO.H;
+const R0=rng(20250923);
+const blobs=[...Array(7)].map(()=>({x:R0()*W,y:R0()*H,s:(R0()*2-1)*1.1,r:250+R0()*400}));
+function lean(x,y){let v=.05;for(const b of blobs){const d=Math.hypot(x-b.x,y-b.y);v+=b.s*Math.exp(-(d*d)/(2*b.r*b.r))}return v}
+
+(function(){const raw=GEO.b.map(b=>{const r=rng(b.id*7+3);return lean(b.cx,b.cy)+(r()*2-1)*.5});const m=raw.reduce((a,x)=>a+x,0)/raw.length;const sd=Math.sqrt(raw.reduce((a,x)=>a+(x-m)**2,0)/raw.length)||1;GEO.b.forEach((b,i)=>b._lean=(raw[i]-m)/sd*.42+.02)})();
+const SCHOOL=['Elementary School','National High School','Barangay Hall','Integrated School','Covered Court','Day Care Center'];
+function codeToInt(code){let h=0;for(let i=0;i<code.length;i++)h=(h*31+code.charCodeAt(i))|0;return h>>>0}
+const B=GEO.b.map((b,i)=>{
+  const real=REAL25.filter(p=>p.barangay===b.name);
+  const L=b._lean;
+  const nPlaces=Math.max(1,Math.min(4,Math.round(real.length/2)));
+  const places=[...Array(nPlaces)].map((_,k)=>`${b.name} ${SCHOOL[(k+Math.floor(rng(b.id+k)()*6))%SCHOOL.length]}`);
+  const precincts=real.map((rp,k)=>{
+    const seed=codeToInt(rp.code);
+    const cycles=YEARS.map(y=>{
+      if(y===2025) return {year:y,rama:rp.espinosa,bopk:rp.esgana,other:rp.other,reg:rp.reg,cast:rp.cast};
+      const rr=rng(seed*17+y);
+      const reg=Math.round(rp.reg*REG_FACTOR[y]*(0.97+rr()*.06));
+      const turn=.60+rr()*.22;
+      const cast=Math.round(reg*turn);
+      const pl=(rr()*2-1)*.45;
+      const share=sig((L+pl+SWING[y]+(rr()*2-1)*.16)*2.4);
+      const rama=Math.round(cast*share);
+      const rest=cast-rama;
+      if(y===2022){ // real 3-way lineup: two Espinosas (merged above) vs Esgana, plus a sliver of others
+        const esganaShare=.80+rr()*.15;
+        const bopk=Math.round(rest*esganaShare);
+        return {year:y,rama,bopk,other:rest-bopk,reg,cast};
+      }
+      return {year:y,rama,bopk:0,other:rest,reg,cast}; // no Esgana on the ballot yet \u2014 opposition was unnamed/fragmented
+    });
+    return {code:rp.code,place:places[k%nPlaces],cycles};
+  });
+  return {...b,idx:i,precincts};
+});
+function summarize(cycles){
+  return cycles.map(c=>{
+    const t=c.rama+c.bopk+c.other;
+    const opp=c.bopk+c.other;
+    const fw=t===0?null:c.rama>opp?'RAMA':c.rama<opp?'OPP':'TIE'; // family control: Espinosa vs everyone else
+    const vals=[['RAMA',c.rama],['BOPK',c.bopk],['OTH',c.other]].sort((a,b)=>b[1]-a[1]);
+    const w=t===0?null:(vals[0][1]===vals[1][1]?'TIE':vals[0][0]);
+    const margin=t?(vals[0][1]-vals[1][1])/t*100:0;
+    return {...c,w,fw,margin,turnout:c.reg?c.cast/c.reg*100:0,rp:t?c.rama/t*100:0,bp:t?c.bopk/t*100:0,op:t?c.other/t*100:0};
+  });
+}
+function classify(s){const r=s.filter(c=>c.fw);if(r.length<2)return'NONE';if(r.every(c=>c.fw==='RAMA'))return'DH_RAMA';if(r.every(c=>c.fw==='OPP'))return'DH_BOPK';return'SWING'}
+const flips=s=>{let f=0;const r=s.filter(c=>c.fw);for(let i=1;i<r.length;i++)if(r[i].fw!==r[i-1].fw)f++;return f};
+for(const b of B){
+  for(const p of b.precincts){p.g=GOYANG_P.find(x=>x.code===p.code)}
+  b.g=GOYANG_B.find(x=>x.barangay===b.name);
+  for(const p of b.precincts){p.s=summarize(p.cycles);p.cls=classify(p.s);p.flips=flips(p.s);p.reg=p.cycles.at(-1).reg}
+  const agg=YEARS.map((y,j)=>b.precincts.reduce((a,p)=>{const c=p.cycles[j];a.rama+=c.rama;a.bopk+=c.bopk;a.other+=c.other;a.reg+=c.reg;a.cast+=c.cast;return a},{year:y,rama:0,bopk:0,other:0,reg:0,cast:0}));
+  b.s=summarize(agg);b.cls=classify(b.s);b.flips=flips(b.s);b.reg=b.s.at(-1).reg;
+}
+
+// ---------- state ----------
+let race='MAYOR';           // 'MAYOR' or 'COUNCILOR'
+let mode='PATTERN';           // 'PATTERN' or a year
+let selected=null, selPrecinct=null, hidden=new Set(), chipFilter=null;
+const $=id=>document.getElementById(id);
+const svg=$('map'),vp=$('vp');
+
+function unitKey(u){if(race==='COUNCILOR')return u.g?(u.g.rank<=3?'TOP3':'OUT'):'NONE';if(mode==='PATTERN')return u.cls;const c=u.s.find(x=>x.year===mode);return c.w?c.w:'NONE'}
+function unitFill(u){if(race==='COUNCILOR')return u.g?(u.g.rank<=3?HEX.TOP3:HEX.OUT):HEX.NONE;if(mode==='PATTERN')return clsColor(u.cls);const c=u.s.find(x=>x.year===mode);return c.w?HEX[c.w]:HEX.NONE}
+function unitOpacity(u){if(race==='COUNCILOR'){if(!u.g)return 1;const r=u.g.rank;return r<=3?(r===1?.95:r===2?.75:.55):(r-3<=2?.4:r-3<=6?.68:.95)}if(mode==='PATTERN')return 1;const m=Math.abs(u.s.find(x=>x.year===mode).margin);return m<10?.4:m<25?.68:.95}
+function keysForMode(){if(race==='COUNCILOR')return [{k:'TOP3',label:'Top 3 finish',color:HEX.TOP3},{k:'OUT',label:'Outside top 3',color:HEX.OUT}];return mode==='PATTERN'?CLASSES.map(c=>({k:c[0],label:c[1],color:clsColor(c[0]),desc:c[3]})):[{k:'RAMA',label:'Espinosa won',color:HEX.RAMA},{k:'BOPK',label:'Esgana won',color:HEX.BOPK},{k:'OTH',label:'Independent won',color:HEX.OTH},{k:'TIE',label:'Tie',color:HEX.TIE},{k:'NONE',label:'No result',color:HEX.NONE}]}
+const labelOf=k=>keysForMode().find(x=>x.k===k)?.label||k;
+const CYCLE_LABEL={RAMA:'Espinosa',BOPK:'Esgana',OTH:'Independent',TIE:'Tie',NONE:'—'}; // fixed per-cycle winner label, independent of the current mode/race view
+const colorOf=k=>keysForMode().find(x=>x.k===k)?.color||HEX.NONE;
+const fmt=n=>n.toLocaleString('en-US');
+const pct=n=>(Math.round(n*10)/10).toFixed(1)+'%';
+
+// ---------- map ----------
+const NS='http://www.w3.org/2000/svg';
+const bg=$('bg');
+B.forEach(b=>{
+  const p=document.createElementNS(NS,'path');p.setAttribute('d',b.d);p.setAttribute('tabindex','0');p.setAttribute('role','button');p.setAttribute('aria-label',b.name);
+  p.dataset.i=b.idx;b.el=p;bg.appendChild(p);
+});
+requestAnimationFrame(()=>B.forEach(b=>{const bb=b.el.getBBox();b.bb=bb}));
+// graticule + context
+(function(){const g=$('grat');for(let x=0;x<=W;x+=125){const l=document.createElementNS(NS,'line');l.setAttribute('x1',x);l.setAttribute('x2',x);l.setAttribute('y1',-400);l.setAttribute('y2',H+400);g.appendChild(l)}
+for(let y=-375;y<=H+400;y+=125){const l=document.createElementNS(NS,'line');l.setAttribute('y1',y);l.setAttribute('y2',y);l.setAttribute('x1',-400);l.setAttribute('x2',W+400);g.appendChild(l)}
+const c=$('ctx');[['Bantayan',-25,H*.22,'end'],['Madridejos',-25,H*.06,'end'],['Visayan Sea',W+22,H*.35,'start'],['Cebu mainland ~60km SE',W*.6,H+34,'middle']].forEach(([t,x,y,a])=>{const e=document.createElementNS(NS,'text');e.textContent=t;e.setAttribute('x',x);e.setAttribute('y',y);e.setAttribute('text-anchor',a);c.appendChild(e)})})();
+
+let view={x:-60,y:-40,w:W+120,h:H+80};
+function fit(){const r=svg.getBoundingClientRect();const ar=r.width/r.height;let w=W+140,h=H+80;if(w/h<ar)w=h*ar;else h=w/ar;return{x:(W-w)/2,y:(H-h)/2,w,h}}
+function setView(v){view=v;svg.setAttribute('viewBox',`${v.x} ${v.y} ${v.w} ${v.h}`);drawLabels()}
+let anim=null;
+function animateTo(t,ms=450){cancelAnimationFrame(anim);const f={...view},t0=performance.now();const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;if(reduce){setView(t);return}
+  const step=now=>{const k=Math.min(1,(now-t0)/ms),e=1-Math.pow(1-k,3);setView({x:f.x+(t.x-f.x)*e,y:f.y+(t.y-f.y)*e,w:f.w+(t.w-f.w)*e,h:f.h+(t.h-f.h)*e});if(k<1)anim=requestAnimationFrame(step)};anim=requestAnimationFrame(step)}
+function zoomTo(bb,pad=1.8,minW=160){const r=svg.getBoundingClientRect(),ar=r.width/r.height;let w=Math.max(bb.width*pad,minW),h=Math.max(bb.height*pad,minW/ar);if(w/h<ar)w=h*ar;else h=w/ar;animateTo({x:bb.x+bb.width/2-w/2,y:bb.y+bb.height/2-h/2,w,h})}
+function zoomBy(f,cx,cy){const v=view;cx??=v.x+v.w/2;cy??=v.y+v.h/2;const w=Math.min(Math.max(v.w*f,60),W*3),h=w*v.h/v.w;setView({x:cx-(cx-v.x)*w/v.w,y:cy-(cy-v.y)*h/v.h,w,h})}
+function toSvg(e){const r=svg.getBoundingClientRect();return{x:view.x+(e.clientX-r.left)/r.width*view.w,y:view.y+(e.clientY-r.top)/r.height*view.h}}
+svg.addEventListener('wheel',e=>{e.preventDefault();const p=toSvg(e);zoomBy(e.deltaY>0?1.15:1/1.15,p.x,p.y)},{passive:false});
+let drag=null,moved=false;
+svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,v:{...view}};moved=false});
+window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!moved&&Math.hypot(dx,dy)<4)return;moved=true;svg.classList.add('drag');const r=svg.getBoundingClientRect();setView({...drag.v,x:drag.v.x-dx/r.width*drag.v.w,y:drag.v.y-dy/r.height*drag.v.h})});
+window.addEventListener('pointerup',()=>{drag=null;svg.classList.remove('drag')});
+$('zin').onclick=()=>zoomBy(1/1.4);$('zout').onclick=()=>zoomBy(1.4);$('zreset').onclick=()=>animateTo(fit());
+$('zdown').onclick=()=>{const b=B.find(b=>b.name==='Poblacion');if(b)zoomTo(b.bb,2.4,170)};
+
+function drawLabels(){const g=$('labels');if(!B[0].bb)return;const r=svg.getBoundingClientRect();const s=r.width/view.w;g.innerHTML='';$('ctx').querySelectorAll('text').forEach(t=>t.setAttribute('font-size',12/s));
+  B.forEach(b=>{const wpx=b.bb.width*s,hpx=b.bb.height*s;const fs=Math.min(13,Math.max(9,wpx/9));if(wpx<b.name.length*fs*.62||hpx<fs*1.6)return;
+    const t=document.createElementNS(NS,'text');t.textContent=b.name;t.setAttribute('x',b.cx);t.setAttribute('y',b.cy);t.setAttribute('font-size',fs/s);t.style.strokeWidth=(3/s)+'px';g.appendChild(t)})}
+
+const tip=$('tip');
+bg.addEventListener('pointermove',e=>{const i=e.target.dataset?.i;if(i==null){tip.style.display='none';return}const b=B[i];
+  let body;
+  if(race==='COUNCILOR'){body=b.g?`${labelOf(unitKey(b))} · rank ${b.g.rank} of ${b.g.n} · ${fmt(b.g.votes)} votes`:'No data';}
+  else{const c=mode==='PATTERN'?null:b.s.find(x=>x.year===mode);body=mode==='PATTERN'?`${labelOf(b.cls)} · ${b.flips} flip${b.flips===1?'':'s'}`:`${labelOf(unitKey(b))} · lead ${pct(Math.abs(c.margin))}`;}
+  tip.innerHTML=`<b>${b.name}</b><br>${body}<br><span class="m">${fmt(b.reg)} voters · ${b.precincts.length} precincts</span>`;
+  tip.style.display='block';const x=e.clientX+14,y=e.clientY+14;tip.style.left=Math.min(x,innerWidth-tip.offsetWidth-8)+'px';tip.style.top=Math.min(y,innerHeight-tip.offsetHeight-8)+'px'});
+bg.addEventListener('pointerleave',()=>tip.style.display='none');
+bg.addEventListener('click',e=>{if(moved)return;const i=e.target.dataset?.i;if(i!=null)selectB(B[i],true)});
+bg.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.dataset?.i!=null){e.preventDefault();selectB(B[e.target.dataset.i],true)}});
+
+function paint(){B.forEach(b=>{b.el.setAttribute('fill',unitFill(b));b.el.style.fillOpacity=hidden.has(unitKey(b))?'':unitOpacity(b);b.el.classList.toggle('dim',hidden.has(unitKey(b)))});
+  $('sel').setAttribute('d',selected?selected.d:'');renderLegend()}
+
+// ---------- header modes ----------
+function renderRaceSel(){const m=$('racesel');m.innerHTML='';[['MAYOR','Mayor'],['COUNCILOR','Espinosa, Goyang · Councilor']].forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;b.setAttribute('aria-pressed',race===v);b.onclick=()=>{race=v;hidden.clear();chipFilter=null;renderRaceSel();renderModes();paint();renderPanel()};m.appendChild(b)})}
+function renderModes(){const m=$('modes');m.style.display=race==='COUNCILOR'?'none':'flex';m.innerHTML='';[['PATTERN','Pattern'],...YEARS.map(y=>[y,String(y)])].forEach(([v,l])=>{const b=document.createElement('button');b.textContent=l;if(v==='PATTERN')b.className='lbl';b.setAttribute('aria-pressed',mode===v);b.onclick=()=>{mode=v;hidden.clear();chipFilter=null;renderModes();paint();renderPanel()};m.appendChild(b)})}
+
+function renderLegend(){const L=$('legend');const counts={};B.forEach(b=>{const k=unitKey(b);counts[k]=(counts[k]||0)+1});
+  const title=race==='COUNCILOR'?'Espinosa, Goyang · Councilor, 2025':(mode==='PATTERN'?'Voting pattern, 2013–2025':`${mode} mayoral result`);
+  const note=race==='COUNCILOR'?'Deeper shade = further from the top-3 cutoff.':(mode==='PATTERN'?'Click a class to isolate it.':'Deeper shade = wider margin.');
+  L.innerHTML=`<h3>${title}</h3>`+keysForMode().filter(k=>race==='COUNCILOR'||mode==='PATTERN'||counts[k.k]).map(k=>`<button data-k="${k.k}" aria-pressed="${!hidden.has(k.k)}"><span class="sw" style="background:${k.color}"></span>${k.label}<span class="n">${counts[k.k]||0}</span></button>`).join('')+`<small>${note}</small>`;
+  L.querySelectorAll('button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;const all=keysForMode().map(x=>x.k);
+    if(hidden.size===0||hidden.has(k)&&hidden.size===all.length-1&&false){hidden=new Set(all.filter(x=>x!==k))}else if(!hidden.has(k)&&hidden.size===all.length-1){hidden.clear()}else{hidden.has(k)?hidden.delete(k):hidden.add(k)}paint()})}
+
+// ---------- panel ----------
+const P=$('panel');
+function stackBar(title,items,unit){const tot=items.reduce((a,x)=>a+x.v,0)||1;return `<div class="bar"><div class="t"><span>${title}</span><b>${unit(tot)}</b></div><div class="stack">${items.map(x=>{const p=x.v/tot*100;return p>0?`<i style="width:${p}%;background:${x.c}" class="${x.c===HEX.SWING?'lt':''}" title="${x.l}: ${pct(p)}">${p>=7?Math.round(p)+'%':''}</i>`:''}).join('')}</div></div>`}
+function splits(units,val){const ks=keysForMode();return ks.map(k=>({l:k.label,c:k.color,v:units.filter(u=>unitKey(u)===k.k).reduce((a,u)=>a+val(u),0)}))}
+function divBars(s){return `<div class="div3">${s.map(c=>{const segs=[['RAMA',c.rp],['BOPK',c.bp],['OTH',c.op]].filter(x=>x[1]>0.05);
+    return `<span>${c.year}</span><div class="stack3" title="Espinosa ${pct(c.rp)} · Esgana ${pct(c.bp)} · Independent ${pct(c.op)}">${segs.map(([k,v])=>`<i style="width:${v}%;background:${HEX[k]}"></i>`).join('')}</div><span class="w3">${CYCLE_LABEL[c.w]||'—'}</span>`}).join('')}</div>`}
+function cycleTable(s){return `<table><thead><tr><th>Year</th><th>Espinosa</th><th>Esgana</th><th>Other</th><th>Lead</th><th>Turnout</th></tr></thead><tbody>${s.map(c=>`<tr><td><span class="win" style="background:${c.w?HEX[c.w]:HEX.NONE}"></span>${c.year}</td><td>${pct(c.rp)}</td><td>${c.bp>0?pct(c.bp):'—'}</td><td>${pct(c.op)}</td><td>${CYCLE_LABEL[c.w]||'—'} +${pct(c.margin)}</td><td>${pct(c.turnout)}</td></tr>`).join('')}</tbody></table>`}
+function badge(u){const k=unitKey(u);return `<span class="badge" style="background:${colorOf(k)};${k==='SWING'||k==='TIE'?'color:#1a1a1a':''}">${labelOf(k)}</span>`}
+function crumb(){return `<nav class="crumb" aria-label="Breadcrumb"><button data-go="city">Santa Fe</button>${selected?` › ${selPrecinct?`<button data-go="brgy">${selected.name}</button> › <span>${selPrecinct.code}</span>`:`<span>${selected.name}</span>`}`:''}</nav>`}
+
+function renderPanel(){
+  if(selPrecinct)return renderPrecinct();
+  if(selected)return renderBrgy();
+  if(race==='COUNCILOR'){
+    const allP=B.flatMap(b=>b.precincts);
+    const ks=keysForMode();
+    const cnt=u=>1;
+    const top3B=B.filter(b=>b.g&&b.g.rank<=3).length;
+    const top3P=allP.filter(p=>p.g&&p.g.rank<=3).length;
+    P.innerHTML=crumb()+`<h2>Townwide</h2><p class="sub">Where Espinosa, Goyang placed in the 2025 councilor race — top 3 of 16 candidates, or not.</p>
+    <div class="stats"><div><b>7th</b><span>citywide rank</span></div><div><b>10,418</b><span>votes (2025)</span></div><div><b>${top3B}/${B.length}</b><span>barangays top 3</span></div><div><b>${top3P}/${allP.length}</b><span>precincts top 3</span></div></div>
+    <section><h3>Share by finish</h3>
+     ${stackBar('Barangays',splits(B,cnt),n=>fmt(n))}
+     ${stackBar('Precincts',splits(allP,cnt),n=>fmt(n))}
+     ${stackBar('Registered voters',splits(B,u=>u.reg),n=>fmt(n))}
+     ${stackBar('Land area',splits(B,u=>u.area),n=>Math.round(n)+' km²')}
+    </section>
+    <section><h3>Areas by finish <small>sorted by voters</small></h3>
+     ${ks.map(k=>{const list=B.filter(b=>unitKey(b)===k.k).sort((a,b)=>b.reg-a.reg);if(!list.length)return'';return `<details open><summary><span class="sw" style="background:${k.color}"></span>${k.label}<span class="n">${list.length}</span></summary><div class="alist">${list.map(b=>`<button data-b="${b.idx}"><span>${b.name}</span><small>rank ${b.g.rank}</small></button>`).join('')}</div></details>`}).join('')}
+    </section>
+    <p class="note">Real 2025 Comelec results for Municipal Councilor, Santa Fe — 16 candidates ran for 8 seats. Espinosa, Goyang placed 7th citywide with 10,418 votes, but her local strength varies: she topped the field in Pooc and placed 4th–6th in several barangays, but slipped to 12th–13th in Talisay. "Top 3" is shown as the positive read since top finishers are the safest bets for one of the 8 seats — it isn't the winning line itself.</p>`;
+    wirePanel();
+    return;
+  }
+  const allP=B.flatMap(b=>b.precincts);
+  const ks=keysForMode();
+  const cnt=u=>1;
+  P.innerHTML=crumb()+`<h2>Townwide</h2><p class="sub">${mode==='PATTERN'?'Consistency of the mayoral vote across five elections.':`Head-to-head winner in the ${mode} mayoral race.`}</p>
+  <div class="stats"><div><b>${B.length}</b><span>barangays</span></div><div><b>${fmt(allP.length)}</b><span>precincts</span></div><div><b>${fmt(B.reduce((a,b)=>a+b.reg,0))}</b><span>voters (2025)</span></div><div><b>${Math.round(B.reduce((a,b)=>a+b.area,0))}</b><span>km² land area</span></div></div>
+  <section><h3>Share by ${mode==='PATTERN'?'pattern':'winner'}</h3>
+   ${stackBar('Barangays',splits(B,cnt),n=>fmt(n))}
+   ${stackBar('Precincts',splits(allP,cnt),n=>fmt(n))}
+   ${stackBar('Registered voters',splits(B,u=>u.reg),n=>fmt(n))}
+   ${stackBar('Land area',splits(B,u=>u.area),n=>Math.round(n)+' km²')}
+  </section>
+  <section><h3>Areas by ${mode==='PATTERN'?'pattern':'winner'} <small>sorted by voters</small></h3>
+   ${ks.map(k=>{const list=B.filter(b=>unitKey(b)===k.k).sort((a,b)=>b.reg-a.reg);if(!list.length)return'';return `<details${k.k==='SWING'?' open':''}><summary><span class="sw" style="background:${k.color}"></span>${k.label}<span class="n">${list.length}</span></summary><div class="alist">${list.map(b=>`<button data-b="${b.idx}"><span>${b.name}</span><small>${fmt(b.reg)}</small></button>`).join('')}</div></details>`}).join('')}
+  </section>
+  <p class="note">2025 figures are real: scraped Comelec precinct returns for Santa Fe mayor — Espinosa, Tamar (1CEBU) 11,762 votes vs Esgana, Paulo (NUP) 7,016 vs Salise, Wilfredo (IND) 115, across all 30 precincts. 2013–2022 are generated sample data built around two real anchors: Jose B. Espinosa's confirmed 2016 win, and the real 2022 field (Ithamar Espinosa NUP, Naomi “Oming” Espinosa PPP, and Jose Esgana PDR all ran — an intra-Espinosa split, which is why that cycle needs three colors, not two). Esgana had no confirmed candidate before 2022, so earlier “opposition” votes are shown as Independent/Other rather than attributed to Esgana. ${mode==='PATTERN'?'A barangay is Die Hard Espinosa only if Espinosa\'s camp outpolled everyone else combined in every cycle on record.':''}</p>`;
+  wirePanel();
+}
+function renderBrgy(){const b=selected;
+  if(race==='COUNCILOR'){
+    const g=b.g;
+    P.innerHTML=crumb()+`<button class="back" data-go="city">← Townwide</button><h2>${b.name}</h2><p class="sub">${badge(b)}</p>
+    <div class="stats"><div><b>${g?g.rank:'—'}</b><span>rank of ${g?g.n:16}</span></div><div><b>${g?fmt(g.votes):'—'}</b><span>votes (2025)</span></div><div><b>${fmt(b.reg)}</b><span>voters</span></div><div><b>${b.precincts.length}</b><span>precincts</span></div></div>
+    <section><h3>Precincts <small>by finish</small></h3>
+     <div class="tiles">${b.precincts.map(p=>{return `<button data-p="${p.code}" style="background:${unitFill(p)};opacity:${unitOpacity(p)}" title="${p.code} · rank ${p.g?p.g.rank:'—'} of ${p.g?p.g.n:16}">${p.code.slice(4)}</button>`}).join('')}</div>
+    </section>
+    <p class="note">Rank among all 16 councilor candidates on that precinct's 2025 return. Green = finished in the top 3 there; orange = did not.</p>`;
+    wirePanel();
+    return;
+  }
+  const ks=keysForMode();const byK={};b.precincts.forEach(p=>{const k=unitKey(p);byK[k]=(byK[k]||0)+1});
+  const places=[...new Set(b.precincts.map(p=>p.place))];
+  P.innerHTML=crumb()+`<button class="back" data-go="city">← Townwide</button><h2>${b.name}</h2><p class="sub">${badge(b)}</p>
+  <div class="stats"><div><b>${fmt(b.reg)}</b><span>voters (2025)</span></div><div><b>${b.precincts.length}</b><span>precincts</span></div><div><b>${b.area<1?b.area.toFixed(2):b.area.toFixed(1)}</b><span>km²</span></div><div><b>${b.flips}</b><span>flips since 2013</span></div></div>
+  <section><h3>Mayoral vote by cycle</h3>${cycleTable(b.s)}${divBars(b.s)}</section>
+  <section><h3>Precincts <small>${mode==='PATTERN'?'by pattern':'by '+mode+' winner'}</small></h3>
+   <div class="chips">${ks.filter(k=>byK[k.k]).map(k=>`<button data-chip="${k.k}" aria-pressed="${chipFilter===k.k}"><span class="sw" style="background:${k.color}"></span>${k.label} ${byK[k.k]}</button>`).join('')}</div>
+   ${places.map(pl=>{const ps=b.precincts.filter(p=>p.place===pl&&(!chipFilter||unitKey(p)===chipFilter));if(!ps.length)return'';return `<div class="pp"><h4>${pl}</h4><div class="tiles">${ps.map(p=>{const k=unitKey(p);return `<button data-p="${p.code}" style="background:${unitFill(p)};opacity:${unitOpacity(p)}" class="${k==='SWING'||k==='TIE'?'lt':''}" title="${p.code} · ${labelOf(k)}">${p.code.slice(4)}</button>`}).join('')}</div></div>`}).join('')}
+  </section>`;
+  wirePanel();
+}
+function renderPrecinct(){const p=selPrecinct;
+  if(race==='COUNCILOR'){
+    const g=p.g;
+    P.innerHTML=crumb()+`<button class="back" data-go="brgy">← ${selected.name}</button><h2>Precinct ${p.code}</h2><p class="sub">${p.place} · ${badge(p)}</p>
+    <div class="stats"><div><b>${g?g.rank:'—'}</b><span>rank of ${g?g.n:16}</span></div><div><b>${g?fmt(g.votes):'—'}</b><span>votes (2025)</span></div><div><b>${fmt(p.reg)}</b><span>voters</span></div><div><b>${pct(p.s.at(-1).turnout)}</b><span>turnout 2025</span></div></div>
+    <p class="note">Espinosa, Goyang's rank among the 16 councilor candidates on this precinct's 2025 return.</p>`;
+    wirePanel();
+    return;
+  }
+  P.innerHTML=crumb()+`<button class="back" data-go="brgy">← ${selected.name}</button><h2>Precinct ${p.code}</h2><p class="sub">${p.place} · ${badge(p)}</p>
+  <div class="stats"><div><b>${fmt(p.reg)}</b><span>voters (2025)</span></div><div><b>${p.flips}</b><span>flips</span></div><div><b>${pct(p.s.at(-1).turnout)}</b><span>turnout 2025</span></div><div><b>${p.s.filter(c=>c.w).length}</b><span>cycles with results</span></div></div>
+  <section><h3>Mayoral vote by cycle</h3>${cycleTable(p.s)}${divBars(p.s)}</section>
+  <p class="note">In real data, clustered precinct codes often change between elections. A precinct is classified only on the cycles where its exact code appears.</p>`;
+  wirePanel();
+}
+function wirePanel(){P.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>{if(e.dataset.go==='city'){selected=null;selPrecinct=null;chipFilter=null;paint();animateTo(fit())}else{selPrecinct=null}renderPanel()});
+  P.querySelectorAll('[data-b]').forEach(e=>e.onclick=()=>selectB(B[e.dataset.b],true));
+  P.querySelectorAll('[data-chip]').forEach(e=>e.onclick=()=>{chipFilter=chipFilter===e.dataset.chip?null:e.dataset.chip;renderBrgy()});
+  P.querySelectorAll('[data-p]').forEach(e=>e.onclick=()=>{selPrecinct=selected.precincts.find(p=>p.code===e.dataset.p);renderPanel();P.scrollTop=0});
+}
+function selectB(b,zoom){selected=b;selPrecinct=null;chipFilter=null;paint();renderPanel();P.scrollTop=0;if(zoom&&b.bb)zoomTo(b.bb,2.2,170)}
+
+// ---------- search ----------
+const q=$('q'),qr=$('qres');
+q.addEventListener('input',()=>{const v=q.value.trim().toLowerCase();if(!v){qr.hidden=true;return}const m=B.filter(b=>b.name.toLowerCase().includes(v)).slice(0,8);
+  qr.innerHTML=m.length?m.map(b=>`<li><button data-b="${b.idx}">${b.name}</button></li>`).join(''):'<li style="padding:7px 10px;color:var(--dim)">No barangay by that name</li>';qr.hidden=false;
+  qr.querySelectorAll('button').forEach(e=>e.onclick=()=>{selectB(B[e.dataset.b],true);q.value='';qr.hidden=true})});
+q.addEventListener('keydown',e=>{if(e.key==='Enter'){qr.querySelector('button')?.click()}if(e.key==='Escape'){q.value='';qr.hidden=true}});
+
+addEventListener('resize',()=>{if(!selected)setView(fit());else drawLabels()});
+renderRaceSel();renderModes();paint();renderPanel();
+requestAnimationFrame(()=>requestAnimationFrame(()=>setView(fit())));
+</script>
+</body>
+</html>
